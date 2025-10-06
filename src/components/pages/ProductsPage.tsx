@@ -1,20 +1,20 @@
-import React, { useState, useRef } from 'react';
-import { Package, Plus, Search, Edit, Trash2, AlertCircle, Tag, X, Upload, Image as ImageIcon } from 'lucide-react';
+import React, { useState } from 'react';
+import { Package, Plus, Search, Edit, Trash2, AlertCircle, Tag, X, Image as ImageIcon } from 'lucide-react';
 import { useData, Product } from '../../contexts/DataContext';
 import { useCategories, Category } from '../../contexts/CategoryContext';
-import { supabase } from '../../lib/supabase';
+// import { supabase } from '../../lib/supabase';
 
 export function ProductsPage() {
   const { products, addProduct, updateProduct, deleteProduct } = useData();
-  const { categories, addCategory, updateCategory, deleteCategory } = useCategories();
+  const { categories, addCategory, updateCategory } = useCategories();
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [uploadingImage, setUploadingImage] = useState(false);
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // const [uploadingImage, setUploadingImage] = useState(false);
+  // const [previewImage, setPreviewImage] = useState<string | null>(null);
+  // const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -59,7 +59,7 @@ export function ProductsPage() {
       description: '',
       image_url: ''
     });
-    setPreviewImage(null);
+    // setPreviewImage(null);
     setShowAddForm(false);
     setEditingProduct(null);
   };
@@ -89,111 +89,175 @@ export function ProductsPage() {
     }
   };
 
-  const handleCategoryEdit = (category: Category) => {
-    setCategoryFormData({
-      name: category.name,
-      description: category.description || '',
-      color: category.color
-    });
-    setEditingCategory(category);
-    setShowCategoryForm(true);
-  };
+  // const handleCategoryEdit = (category: Category) => {
+  //   setCategoryFormData({
+  //     name: category.name,
+  //     description: category.description || '',
+  //     color: category.color
+  //   });
+  //   setEditingCategory(category);
+  //   setShowCategoryForm(true);
+  // };
 
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  // const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  //   const file = event.target.files?.[0];
+  //   if (!file) return;
 
-    // Rasm formatini tekshirish
-    if (!file.type.startsWith('image/')) {
-      alert('Faqat rasm fayllari yuklanishi mumkin!');
-      return;
-    }
+  //   // Rasm formatini tekshirish
+  //   if (!file.type.startsWith('image/')) {
+  //     alert('Faqat rasm fayllari yuklanishi mumkin!');
+  //     return;
+  //   }
 
-    // Rasm hajmini tekshirish (5MB dan kichik)
-    if (file.size > 5 * 1024 * 1024) {
-      alert('Rasm hajmi 5MB dan kichik bo\'lishi kerak!');
-      return;
-    }
+  //   // Rasm hajmini tekshirish (5MB dan kichik)
+  //   if (file.size > 5 * 1024 * 1024) {
+  //     alert('Rasm hajmi 5MB dan kichik bo\'lishi kerak!');
+  //     return;
+  //   }
 
-    try {
-      setUploadingImage(true);
+  //   try {
+  //     setUploadingImage(true);
       
-      // Preview yaratish
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setPreviewImage(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
+  //     // Preview yaratish
+  //     const reader = new FileReader();
+  //     reader.onload = (e) => {
+  //       setPreviewImage(e.target?.result as string);
+  //     };
+  //     reader.readAsDataURL(file);
 
-      // Supabase'ga yuklash
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+  //     // Supabase'ga yuklash
+  //     const fileExt = file.name.split('.').pop();
+  //     const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
       
-      console.log('Uploading file:', fileName);
-      console.log('File size:', file.size);
-      console.log('File type:', file.type);
+  //     console.log('Uploading file:', fileName);
+  //     console.log('File size:', file.size);
+  //     console.log('File type:', file.type);
       
-      const { data, error } = await supabase.storage
-        .from('product-images')
-        .upload(fileName, file);
+  //     const { error } = await supabase.storage
+  //       .from('product-images')
+  //       .upload(fileName, file);
 
-      if (error) {
-        console.error('Storage error:', error);
-        console.error('Error details:', {
-          message: error.message,
-          statusCode: error.statusCode,
-          error: error.error
-        });
+  //     if (error) {
+  //       console.error('Storage error:', error);
+  //       console.error('Error details:', {
+  //         message: error.message
+  //       });
         
-        // Agar bucket mavjud bo'lmasa, fallback
-        if (error.message.includes('bucket') || error.message.includes('not found')) {
-          alert('Storage bucket topilmadi. Iltimos, Supabase Dashboard\'da "product-images" bucket\'ini yarating.');
-          return;
-        }
+  //       // Agar bucket mavjud bo'lmasa, fallback
+  //       if (error.message.includes('bucket') || error.message.includes('not found')) {
+  //         alert('Storage bucket topilmadi. Iltimos, Supabase Dashboard\'da "product-images" bucket\'ini yarating.');
+  //         return;
+  //       }
         
-        // RLS policy xatoligi
-        if (error.message.includes('row-level security') || error.message.includes('policy') || error.message.includes('violates') || error.message.includes('permission') || error.message.includes('already exists')) {
-          alert('Ruxsat xatoligi. Iltimos, Supabase SQL Editor\'da quyidagi kodlarni ishlating:\n\n1. DO $$ \nDECLARE\n    r RECORD;\nBEGIN\n    FOR r IN (SELECT policyname FROM pg_policies WHERE schemaname = \'storage\' AND tablename = \'objects\') LOOP\n        EXECUTE \'DROP POLICY IF EXISTS "\' || r.policyname || \'" ON storage.objects\';\n    END LOOP;\nEND $$;\n\n2. ALTER TABLE storage.objects DISABLE ROW LEVEL SECURITY;\n3. ALTER TABLE storage.buckets DISABLE ROW LEVEL SECURITY;\n4. INSERT INTO storage.buckets (id, name, public) VALUES (\'product-images\', \'product-images\', true) ON CONFLICT (id) DO NOTHING;\n\nYoki Supabase Dashboard\'da Storage > Settings > Policies bo\'limiga o\'ting va barcha policies\'larni o\'chiring.');
-          return;
-        }
+  //       // RLS policy xatoligi
+  //       if (error.message.includes('row-level security') || error.message.includes('policy') || error.message.includes('violates') || error.message.includes('permission') || error.message.includes('already exists')) {
+  //         alert('Ruxsat xatoligi. Iltimos, Supabase SQL Editor\'da quyidagi kodlarni ishlating:\n\n1. DO $$ \nDECLARE\n    r RECORD;\nBEGIN\n    FOR r IN (SELECT policyname FROM pg_policies WHERE schemaname = \'storage\' AND tablename = \'objects\') LOOP\n        EXECUTE \'DROP POLICY IF EXISTS "\' || r.policyname || \'" ON storage.objects\';\n    END LOOP;\nEND $$;\n\n2. ALTER TABLE storage.objects DISABLE ROW LEVEL SECURITY;\n3. ALTER TABLE storage.buckets DISABLE ROW LEVEL SECURITY;\n4. INSERT INTO storage.buckets (id, name, public) VALUES (\'product-images\', \'product-images\', true) ON CONFLICT (id) DO NOTHING;\n\nYoki Supabase Dashboard\'da Storage > Settings > Policies bo\'limiga o\'ting va barcha policies\'larni o\'chiring.');
+  //         return;
+  //       }
         
-        throw error;
-      }
+  //       throw error;
+  //     }
 
-      // Public URL olish
-      const { data: { publicUrl } } = supabase.storage
-        .from('product-images')
-        .getPublicUrl(fileName);
+  //     // Public URL olish
+  //     const { data: { publicUrl } } = supabase.storage
+  //       .from('product-images')
+  //       .getPublicUrl(fileName);
 
-      setFormData(prev => ({ ...prev, image_url: publicUrl }));
+  //     setFormData(prev => ({ ...prev, image_url: publicUrl }));
       
-    } catch (error) {
-      console.error('Rasm yuklashda xatolik:', error);
+  //   } catch (error) {
+  //     console.error('Rasm yuklashda xatolik:', error);
       
-      // Xatolik turiga qarab xabar berish
-      if (error instanceof Error) {
-        if (error.message.includes('bucket')) {
-          alert('Storage bucket topilmadi. Iltimos, Supabase Dashboard\'da "product-images" bucket\'ini yarating.');
-        } else if (error.message.includes('permission')) {
-          alert('Rasm yuklash uchun ruxsat yo\'q. Iltimos, admin bilan bog\'laning.');
-        } else {
-          alert(`Rasm yuklashda xatolik: ${error.message}`);
-        }
-      } else {
-        alert('Rasm yuklashda noma\'lum xatolik yuz berdi!');
-      }
-    } finally {
-      setUploadingImage(false);
-    }
-  };
+  //     // Xatolik turiga qarab xabar berish
+  //     if (error instanceof Error) {
+  //       if (error.message.includes('bucket')) {
+  //         alert('Storage bucket topilmadi. Iltimos, Supabase Dashboard\'da "product-images" bucket\'ini yarating.');
+  //       } else if (error.message.includes('permission')) {
+  //         alert('Rasm yuklash uchun ruxsat yo\'q. Iltimos, admin bilan bog\'laning.');
+  //       } else {
+  //         alert(`Rasm yuklashda xatolik: ${error.message}`);
+  //       }
+  //     } else {
+  //       alert('Rasm yuklashda noma\'lum xatolik yuz berdi!');
+  //     }
+  //   } finally {
+  //     setUploadingImage(false);
+  //   }
+  // };
 
-  const removeImage = () => {
-    setPreviewImage(null);
-    setFormData(prev => ({ ...prev, image_url: '' }));
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
+  // const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  //   const file = event.target.files?.[0];
+  //   if (!file) return;
+
+  //   // Rasm formatini tekshirish
+  //   if (!file.type.startsWith('image/')) {
+  //     alert('Faqat rasm fayllari yuklanishi mumkin!');
+  //     return;
+  //   }
+
+  //   // Rasm hajmini tekshirish (5MB dan kichik)
+  //   if (file.size > 5 * 1024 * 1024) {
+  //     alert('Rasm hajmi 5MB dan kichik bo\'lishi kerak!');
+  //     return;
+  //   }
+
+  //   try {
+  //     setUploadingImage(true);
+      
+  //     // Preview yaratish
+  //     const reader = new FileReader();
+  //     reader.onload = (e) => {
+  //       setPreviewImage(e.target?.result as string);
+  //     };
+  //     reader.readAsDataURL(file);
+
+  //     // Supabase'ga yuklash
+  //     const fileExt = file.name.split('.').pop();
+  //     const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+      
+  //     const { error } = await supabase.storage
+  //       .from('product-images')
+  //       .upload(fileName, file);
+
+  //     if (error) {
+  //       console.error('Storage error:', error);
+  //       console.error('Error details:', {
+  //         message: error.message
+  //       });
+        
+  //       // Xatolik turiga qarab xabar berish
+  //       if (error.message.includes('bucket')) {
+  //         alert('Storage bucket topilmadi. Iltimos, Supabase Dashboard\'da "product-images" bucket\'ini yarating.');
+  //       } else if (error.message.includes('permission')) {
+  //         alert('Rasm yuklash uchun ruxsat yo\'q. Iltimos, admin bilan bog\'laning.');
+  //       } else {
+  //         alert(`Rasm yuklashda xatolik: ${error.message}`);
+  //       }
+  //       return;
+  //     }
+
+  //     // Public URL olish
+  //     const { data: { publicUrl } } = supabase.storage
+  //       .from('product-images')
+  //       .getPublicUrl(fileName);
+
+  //     setFormData(prev => ({ ...prev, image_url: publicUrl }));
+      
+  //   } catch (error) {
+  //     console.error('Rasm yuklashda xatolik:', error);
+  //     alert('Rasm yuklashda xatolik yuz berdi!');
+  //   } finally {
+  //     setUploadingImage(false);
+  //   }
+  // };
+
+  // const removeImage = () => {
+  //   setPreviewImage(null);
+  //   setFormData(prev => ({ ...prev, image_url: '' }));
+  //   if (fileInputRef.current) {
+  //     fileInputRef.current.value = '';
+  //   }
+  // };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -232,7 +296,7 @@ export function ProductsPage() {
       name: product.name,
       category: product.category,
       brand: product.brand,
-      price: product.price.toString(),
+      price: (product as any).price?.toString() || '',
       cost_price: product.cost_price.toString(),
       selling_price: product.selling_price.toString(),
       discount: product.discount.toString(),
@@ -242,7 +306,7 @@ export function ProductsPage() {
       description: product.description,
       image_url: product.image_url || ''
     });
-    setPreviewImage(product.image_url || null);
+    // setPreviewImage(product.image_url || null);
     setEditingProduct(product);
     setShowAddForm(true);
   };

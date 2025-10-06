@@ -19,7 +19,7 @@ export default function Dashboard() {
   const renderCurrentPage = () => {
     switch (currentPage) {
       case 'dashboard':
-        return <DashboardHome />;
+        return <DashboardHome onPageChange={setCurrentPage} />;
       case 'products':
         return <ProductsPage />;
       case 'warehouse':

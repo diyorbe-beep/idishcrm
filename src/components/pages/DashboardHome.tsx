@@ -6,7 +6,11 @@ import {
 import { useData } from '../../contexts/DataContext';
 import { useAuth } from '../../contexts/AuthContext';
 
-export function DashboardHome() {
+interface DashboardHomeProps {
+  onPageChange: (page: string) => void;
+}
+
+export function DashboardHome({ onPageChange }: DashboardHomeProps) {
   const { products, customers, sales } = useData();
   const { user } = useAuth();
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -134,7 +138,10 @@ export function DashboardHome() {
         <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-200">
           <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Tezkor amallar</h2>
           <div className="space-y-2 sm:space-y-3">
-            <button className="w-full flex items-center space-x-2 sm:space-x-3 p-2 sm:p-3 text-left hover:bg-gray-50 rounded-lg transition-colors">
+            <button 
+              onClick={() => onPageChange('sales')}
+              className="w-full flex items-center space-x-2 sm:space-x-3 p-2 sm:p-3 text-left hover:bg-gray-50 rounded-lg transition-colors"
+            >
               <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
                 <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
               </div>
@@ -143,7 +150,10 @@ export function DashboardHome() {
                 <p className="text-xs sm:text-sm text-gray-500">Kassa oynasini ochish</p>
               </div>
             </button>
-            <button className="w-full flex items-center space-x-2 sm:space-x-3 p-2 sm:p-3 text-left hover:bg-gray-50 rounded-lg transition-colors">
+            <button 
+              onClick={() => onPageChange('products')}
+              className="w-full flex items-center space-x-2 sm:space-x-3 p-2 sm:p-3 text-left hover:bg-gray-50 rounded-lg transition-colors"
+            >
               <div className="w-8 h-8 sm:w-10 sm:h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
                 <Package className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
               </div>
@@ -152,7 +162,10 @@ export function DashboardHome() {
                 <p className="text-xs sm:text-sm text-gray-500">Yangi tovar kiritish</p>
               </div>
             </button>
-            <button className="w-full flex items-center space-x-2 sm:space-x-3 p-2 sm:p-3 text-left hover:bg-gray-50 rounded-lg transition-colors">
+            <button 
+              onClick={() => onPageChange('customers')}
+              className="w-full flex items-center space-x-2 sm:space-x-3 p-2 sm:p-3 text-left hover:bg-gray-50 rounded-lg transition-colors"
+            >
               <div className="w-8 h-8 sm:w-10 sm:h-10 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
                 <Users className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" />
               </div>
