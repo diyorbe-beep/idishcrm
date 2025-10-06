@@ -4,6 +4,7 @@ import Dashboard from './components/Dashboard';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { DataProvider } from './contexts/DataContext';
 import { NotificationProvider } from './contexts/NotificationContext';
+import { CategoryProvider } from './contexts/CategoryContext';
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -30,9 +31,11 @@ function App() {
   return (
     <AuthProvider>
       <DataProvider>
-        <NotificationProvider>
-          <AppContent />
-        </NotificationProvider>
+        <CategoryProvider>
+          <NotificationProvider>
+            <AppContent />
+          </NotificationProvider>
+        </CategoryProvider>
       </DataProvider>
     </AuthProvider>
   );

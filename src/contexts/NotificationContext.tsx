@@ -28,108 +28,80 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const { products, sales, customers } = useData();
-  const [lastCheckTime, setLastCheckTime] = useState<Date>(new Date());
 
-  // Real-time bildirishnomalar yaratish
+  // Real-time bildirishnomalar yaratish - soddalashtirilgan versiya
   useEffect(() => {
     const checkForNotifications = () => {
-      const now = new Date();
-      
       // Tugab qolgan mahsulotlar tekshiruvi
       const lowStockProducts = products.filter(p => p.quantity <= p.min_quantity);
       
-      // Eski tugab qolgan bildirishnomalarni o'chirish
-      setNotifications(prev => prev.filter(n => 
-        !(n.type === 'warning' && n.title.includes('Tugab qolgan'))
-      ));
-      
-      // Yangi tugab qolgan mahsulotlar uchun bildirishnoma
       if (lowStockProducts.length > 0) {
-        lowStockProducts.forEach(product => {
-          const existingNotification = notifications.find(n => 
-            n.type === 'warning' && 
-            n.title.includes('Tugab qolgan') && 
-            n.message.includes(product.name)
+        setNotifications(prev => {
+          const existingLowStock = prev.filter(n => 
+            n.type === 'warning' && n.title.includes('Tugab qolgan')
           );
           
-          if (!existingNotification) {
-            addNotification({
-              type: 'warning',
-              title: 'Tugab qolgan mahsulot',
-              message: `${product.name} - ${product.quantity} ta qoldi (min: ${product.min_quantity} ta)`,
+          if (existingLowStock.length === 0) {
+            return [...prev, {
+              id: 'low-stock-' + Date.now(),
+              type: 'warning' as const,
+              title: 'Tugab qolgan mahsulotlar',
+              message: `${lowStockProducts.length} ta mahsulot tugab qolgan`,
+              timestamp: new Date(),
+              read: false,
               action: {
                 label: 'Ko\'rish',
                 onClick: () => {
-                  // Mahsulotlar sahifasiga o'tish
                   window.location.hash = '#products';
                 }
               }
-            });
+            }];
           }
+          return prev;
         });
       }
 
-      // Bugungi yangi savdolar uchun bildirishnoma
+      // Bugungi savdolar uchun bildirishnoma
       const today = new Date().toDateString();
       const todaysSales = sales.filter(sale => 
         new Date(sale.created_at).toDateString() === today
       );
 
       if (todaysSales.length > 0) {
-        const lastNotification = notifications.find(n => 
-          n.type === 'success' && 
-          n.title.includes('Yangi savdo') &&
-          new Date(n.timestamp).toDateString() === today
-        );
-
-        if (!lastNotification) {
-          addNotification({
-            type: 'success',
-            title: 'Yangi savdo',
-            message: `Bugun ${todaysSales.length} ta savdo amalga oshirildi`,
-            action: {
-              label: 'Ko\'rish',
-              onClick: () => {
-                window.location.hash = '#sales';
+        setNotifications(prev => {
+          const existingSales = prev.find(n => 
+            n.type === 'success' && n.title.includes('Yangi savdo')
+          );
+          
+          if (!existingSales) {
+            return [...prev, {
+              id: 'todays-sales-' + Date.now(),
+              type: 'success' as const,
+              title: 'Yangi savdo',
+              message: `Bugun ${todaysSales.length} ta savdo amalga oshirildi`,
+              timestamp: new Date(),
+              read: false,
+              action: {
+                label: 'Ko\'rish',
+                onClick: () => {
+                  window.location.hash = '#sales';
+                }
               }
-            }
-          });
-        }
-      }
-
-      // Yangi mijozlar uchun bildirishnoma
-      const recentCustomers = customers.filter(customer => {
-        const customerDate = new Date(customer.created_at);
-        return customerDate > lastCheckTime;
-      });
-
-      if (recentCustomers.length > 0) {
-        recentCustomers.forEach(customer => {
-          addNotification({
-            type: 'info',
-            title: 'Yangi mijoz',
-            message: `${customer.name} ro'yxatga qo'shildi`,
-            action: {
-              label: 'Ko\'rish',
-              onClick: () => {
-                window.location.hash = '#customers';
-              }
-            }
-          });
+            }];
+          }
+          return prev;
         });
       }
-
-      setLastCheckTime(now);
     };
 
-    // Har 30 soniyada tekshirish
-    const interval = setInterval(checkForNotifications, 30000);
+    // Har 60 soniyada tekshirish (kamroq tez-tez)
+    const interval = setInterval(checkForNotifications, 60000);
 
     // Dastlabki tekshirish
     checkForNotifications();
 
     return () => clearInterval(interval);
-  }, [products, sales, customers, lastCheckTime]);
+  }, [products, sales, customers]);
 
   const addNotification = (notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => {
     const newNotification: Notification = {

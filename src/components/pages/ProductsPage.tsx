@@ -1,24 +1,40 @@
-import React, { useState } from 'react';
-import { Package, Plus, Search, Edit, Trash2, AlertCircle } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Package, Plus, Search, Edit, Trash2, AlertCircle, Tag, X, Upload, Image as ImageIcon } from 'lucide-react';
 import { useData, Product } from '../../contexts/DataContext';
+import { useCategories, Category } from '../../contexts/CategoryContext';
+import { supabase } from '../../lib/supabase';
 
 export function ProductsPage() {
   const { products, addProduct, updateProduct, deleteProduct } = useData();
+  const { categories, addCategory, updateCategory, deleteCategory } = useCategories();
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [showCategoryForm, setShowCategoryForm] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
     name: '',
     category: '',
     brand: '',
+    price: '',
     cost_price: '',
     selling_price: '',
     discount: '',
     quantity: '',
     min_quantity: '',
     barcode: '',
-    description: ''
+    description: '',
+    image_url: ''
+  });
+
+  const [categoryFormData, setCategoryFormData] = useState({
+    name: '',
+    description: '',
+    color: '#3B82F6'
   });
 
   const filteredProducts = products.filter(product =>
@@ -33,41 +49,182 @@ export function ProductsPage() {
       name: '',
       category: '',
       brand: '',
+      price: '',
       cost_price: '',
       selling_price: '',
       discount: '',
       quantity: '',
       min_quantity: '',
       barcode: '',
-      description: ''
+      description: '',
+      image_url: ''
     });
+    setPreviewImage(null);
     setShowAddForm(false);
     setEditingProduct(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const resetCategoryForm = () => {
+    setCategoryFormData({
+      name: '',
+      description: '',
+      color: '#3B82F6'
+    });
+    setShowCategoryForm(false);
+    setEditingCategory(null);
+  };
+
+  const handleCategorySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const productData = {
-      name: formData.name,
-      category: formData.category,
-      brand: formData.brand,
-      cost_price: Number(formData.cost_price),
-      selling_price: Number(formData.selling_price),
-      discount: Number(formData.discount),
-      quantity: Number(formData.quantity),
-      min_quantity: Number(formData.min_quantity),
-      barcode: formData.barcode,
-      description: formData.description
-    };
-
-    if (editingProduct) {
-      updateProduct(editingProduct.id, productData);
-    } else {
-      addProduct(productData);
+    try {
+      if (editingCategory) {
+        await updateCategory(editingCategory.id, categoryFormData);
+      } else {
+        await addCategory(categoryFormData);
+      }
+      resetCategoryForm();
+    } catch (error) {
+      console.error('Error saving category:', error);
     }
+  };
+
+  const handleCategoryEdit = (category: Category) => {
+    setCategoryFormData({
+      name: category.name,
+      description: category.description || '',
+      color: category.color
+    });
+    setEditingCategory(category);
+    setShowCategoryForm(true);
+  };
+
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Rasm formatini tekshirish
+    if (!file.type.startsWith('image/')) {
+      alert('Faqat rasm fayllari yuklanishi mumkin!');
+      return;
+    }
+
+    // Rasm hajmini tekshirish (5MB dan kichik)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Rasm hajmi 5MB dan kichik bo\'lishi kerak!');
+      return;
+    }
+
+    try {
+      setUploadingImage(true);
+      
+      // Preview yaratish
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setPreviewImage(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+
+      // Supabase'ga yuklash
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+      
+      console.log('Uploading file:', fileName);
+      console.log('File size:', file.size);
+      console.log('File type:', file.type);
+      
+      const { data, error } = await supabase.storage
+        .from('product-images')
+        .upload(fileName, file);
+
+      if (error) {
+        console.error('Storage error:', error);
+        console.error('Error details:', {
+          message: error.message,
+          statusCode: error.statusCode,
+          error: error.error
+        });
+        
+        // Agar bucket mavjud bo'lmasa, fallback
+        if (error.message.includes('bucket') || error.message.includes('not found')) {
+          alert('Storage bucket topilmadi. Iltimos, Supabase Dashboard\'da "product-images" bucket\'ini yarating.');
+          return;
+        }
+        
+        // RLS policy xatoligi
+        if (error.message.includes('row-level security') || error.message.includes('policy') || error.message.includes('violates') || error.message.includes('permission') || error.message.includes('already exists')) {
+          alert('Ruxsat xatoligi. Iltimos, Supabase SQL Editor\'da quyidagi kodlarni ishlating:\n\n1. DO $$ \nDECLARE\n    r RECORD;\nBEGIN\n    FOR r IN (SELECT policyname FROM pg_policies WHERE schemaname = \'storage\' AND tablename = \'objects\') LOOP\n        EXECUTE \'DROP POLICY IF EXISTS "\' || r.policyname || \'" ON storage.objects\';\n    END LOOP;\nEND $$;\n\n2. ALTER TABLE storage.objects DISABLE ROW LEVEL SECURITY;\n3. ALTER TABLE storage.buckets DISABLE ROW LEVEL SECURITY;\n4. INSERT INTO storage.buckets (id, name, public) VALUES (\'product-images\', \'product-images\', true) ON CONFLICT (id) DO NOTHING;\n\nYoki Supabase Dashboard\'da Storage > Settings > Policies bo\'limiga o\'ting va barcha policies\'larni o\'chiring.');
+          return;
+        }
+        
+        throw error;
+      }
+
+      // Public URL olish
+      const { data: { publicUrl } } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(fileName);
+
+      setFormData(prev => ({ ...prev, image_url: publicUrl }));
+      
+    } catch (error) {
+      console.error('Rasm yuklashda xatolik:', error);
+      
+      // Xatolik turiga qarab xabar berish
+      if (error instanceof Error) {
+        if (error.message.includes('bucket')) {
+          alert('Storage bucket topilmadi. Iltimos, Supabase Dashboard\'da "product-images" bucket\'ini yarating.');
+        } else if (error.message.includes('permission')) {
+          alert('Rasm yuklash uchun ruxsat yo\'q. Iltimos, admin bilan bog\'laning.');
+        } else {
+          alert(`Rasm yuklashda xatolik: ${error.message}`);
+        }
+      } else {
+        alert('Rasm yuklashda noma\'lum xatolik yuz berdi!');
+      }
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const removeImage = () => {
+    setPreviewImage(null);
+    setFormData(prev => ({ ...prev, image_url: '' }));
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     
-    resetForm();
+    try {
+      const productData = {
+        name: formData.name,
+        category: formData.category,
+        brand: formData.brand,
+        price: Number(formData.price),
+        cost_price: Number(formData.cost_price),
+        selling_price: Number(formData.selling_price),
+        discount: Number(formData.discount),
+        quantity: Number(formData.quantity),
+        min_quantity: Number(formData.min_quantity),
+        barcode: formData.barcode,
+        description: formData.description,
+        image_url: formData.image_url || undefined // Rasm yo'q bo'lsa undefined
+      };
+
+      if (editingProduct) {
+        await updateProduct(editingProduct.id, productData);
+      } else {
+        await addProduct(productData);
+      }
+      
+      resetForm();
+    } catch (error) {
+      console.error('Error saving product:', error);
+      alert('Mahsulot saqlashda xatolik yuz berdi. Iltimos, qayta urinib ko\'ring.');
+    }
   };
 
   const handleEdit = (product: Product) => {
@@ -75,14 +232,17 @@ export function ProductsPage() {
       name: product.name,
       category: product.category,
       brand: product.brand,
+      price: product.price.toString(),
       cost_price: product.cost_price.toString(),
       selling_price: product.selling_price.toString(),
       discount: product.discount.toString(),
       quantity: product.quantity.toString(),
       min_quantity: product.min_quantity.toString(),
       barcode: product.barcode,
-      description: product.description
+      description: product.description,
+      image_url: product.image_url || ''
     });
+    setPreviewImage(product.image_url || null);
     setEditingProduct(product);
     setShowAddForm(true);
   };
@@ -99,13 +259,22 @@ export function ProductsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Mahsulotlar</h1>
           <p className="text-gray-600">Ombordagi barcha mahsulotlarni boshqaring</p>
         </div>
-        <button
-          onClick={() => setShowAddForm(true)}
-          className="mt-4 sm:mt-0 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center space-x-2 transition-colors"
-        >
-          <Plus className="w-5 h-5" />
-          <span>Mahsulot qo'shish</span>
-        </button>
+        <div className="mt-4 sm:mt-0 flex space-x-3">
+          <button
+            onClick={() => setShowCategoryForm(true)}
+            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center space-x-2 transition-colors"
+          >
+            <Tag className="w-5 h-5" />
+            <span>Kategoriya qo'shish</span>
+          </button>
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center space-x-2 transition-colors"
+          >
+            <Plus className="w-5 h-5" />
+            <span>Mahsulot qo'shish</span>
+          </button>
+        </div>
       </div>
 
       {/* Search */}
@@ -128,8 +297,16 @@ export function ProductsPage() {
           <div key={product.id} className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <Package className="w-6 h-6 text-blue-600" />
+                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center overflow-hidden">
+                  {product.image_url ? (
+                    <img 
+                      src={product.image_url} 
+                      alt={product.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <Package className="w-6 h-6 text-blue-600" />
+                  )}
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-900">{product.name}</h3>
@@ -193,11 +370,25 @@ export function ProductsPage() {
 
       {/* Add/Edit Product Modal */}
       {showAddForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <h2 className="text-xl font-bold text-gray-900 mb-6">
-              {editingProduct ? 'Mahsulotni tahrirlash' : 'Yangi mahsulot qo\'shish'}
-            </h2>
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+          onClick={resetForm}
+        >
+          <div 
+            className="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-gray-900">
+                {editingProduct ? 'Mahsulotni tahrirlash' : 'Yangi mahsulot qo\'shish'}
+              </h2>
+              <button
+                onClick={resetForm}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -214,37 +405,60 @@ export function ProductsPage() {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Brend *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.brand}
-                    onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    required
-                  />
-                </div>
+                     <div>
+                       <label className="block text-sm font-medium text-gray-700 mb-2">
+                         Brend *
+                       </label>
+                       <input
+                         type="text"
+                         value={formData.brand}
+                         onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                         required
+                       />
+                     </div>
+
+                     <div>
+                       <label className="block text-sm font-medium text-gray-700 mb-2">
+                         Asosiy narx (so'm) *
+                       </label>
+                       <input
+                         type="number"
+                         value={formData.price}
+                         onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                         placeholder="Mahsulot asosiy narxi"
+                         required
+                       />
+                     </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Kategoriya *
                   </label>
-                  <select
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    required
-                  >
-                    <option value="">Kategoriyani tanlang</option>
-                    <option value="Telefonlar">Telefonlar</option>
-                    <option value="Sovutgichlar">Sovutgichlar</option>
-                    <option value="Kir Yuvish">Kir Yuvish</option>
-                    <option value="Televizorlar">Televizorlar</option>
-                    <option value="Konditsionerlar">Konditsionerlar</option>
-                    <option value="Oshxona">Oshxona</option>
-                  </select>
+                  <div className="flex space-x-2">
+                    <select
+                      value={formData.category}
+                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      required
+                    >
+                      <option value="">Kategoriyani tanlang</option>
+                      {categories.map((category) => (
+                        <option key={category.id} value={category.name}>
+                          {category.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setShowCategoryForm(true)}
+                      className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                      title="Yangi kategoriya qo'shish"
+                    >
+                      <Tag className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
 
                 <div>
@@ -342,6 +556,17 @@ export function ProductsPage() {
                 ></textarea>
               </div>
 
+                     {/* Rasm yuklash - vaqtincha o'chirilgan */}
+                     <div>
+                       <label className="block text-sm font-medium text-gray-700 mb-2">
+                         Mahsulot rasmi
+                       </label>
+                       <div className="flex items-center space-x-2 text-sm text-gray-500">
+                         <ImageIcon className="w-4 h-4" />
+                         <span>Rasm yuklash funksiyasi keyinroq qo'shiladi</span>
+                       </div>
+                     </div>
+
               <div className="flex justify-end space-x-4 pt-4">
                 <button
                   type="button"
@@ -355,6 +580,95 @@ export function ProductsPage() {
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
                   {editingProduct ? 'Saqlash' : 'Qo\'shish'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add/Edit Category Modal */}
+      {showCategoryForm && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+          onClick={resetCategoryForm}
+        >
+          <div 
+            className="bg-white rounded-xl p-6 w-full max-w-md"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-gray-900">
+                {editingCategory ? 'Kategoriyani tahrirlash' : 'Yangi kategoriya qo\'shish'}
+              </h2>
+              <button
+                onClick={resetCategoryForm}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCategorySubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Kategoriya nomi *
+                </label>
+                <input
+                  type="text"
+                  value={categoryFormData.name}
+                  onChange={(e) => setCategoryFormData({ ...categoryFormData, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  placeholder="Masalan: Telefonlar"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Tavsif
+                </label>
+                <textarea
+                  value={categoryFormData.description}
+                  onChange={(e) => setCategoryFormData({ ...categoryFormData, description: e.target.value })}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  placeholder="Kategoriya haqida qisqacha ma'lumot..."
+                ></textarea>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Rang
+                </label>
+                <div className="flex items-center space-x-3">
+                  <input
+                    type="color"
+                    value={categoryFormData.color}
+                    onChange={(e) => setCategoryFormData({ ...categoryFormData, color: e.target.value })}
+                    className="w-12 h-10 border border-gray-300 rounded-lg cursor-pointer"
+                  />
+                  <div 
+                    className="w-8 h-8 rounded-lg border border-gray-300"
+                    style={{ backgroundColor: categoryFormData.color }}
+                  ></div>
+                  <span className="text-sm text-gray-600">{categoryFormData.color}</span>
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-4 pt-4">
+                <button
+                  type="button"
+                  onClick={resetCategoryForm}
+                  className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
+                >
+                  Bekor qilish
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  {editingCategory ? 'Saqlash' : 'Qo\'shish'}
                 </button>
               </div>
             </form>
