@@ -6,7 +6,7 @@ import { useCategories, Category } from '../../contexts/CategoryContext';
 
 export function ProductsPage() {
   const { products, addProduct, updateProduct, deleteProduct } = useData();
-  const { categories, addCategory, updateCategory } = useCategories();
+  const { categories, addCategory, updateCategory, deleteCategory } = useCategories();
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -14,6 +14,7 @@ export function ProductsPage() {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCategorySubmitting, setIsCategorySubmitting] = useState(false);
+  const [isDeletingCategory, setIsDeletingCategory] = useState<string | null>(null);
   // const [uploadingImage, setUploadingImage] = useState(false);
   // const [previewImage, setPreviewImage] = useState<string | null>(null);
   // const fileInputRef = useRef<HTMLInputElement>(null);
@@ -92,6 +93,25 @@ export function ProductsPage() {
       alert('Kategoriya saqlanmadi. Xatolik: ' + (error as Error).message);
     } finally {
       setIsCategorySubmitting(false);
+    }
+  };
+
+  const handleDeleteCategory = async (id: string, name: string) => {
+    const confirmDelete = window.confirm(
+      `"${name}" kategoriyasini o'chirishni xohlaysizmi?\n\nDiqqat: Bu kategoriyaga bog'langan mahsulotlar ham o'chiriladi!`
+    );
+    
+    if (!confirmDelete) return;
+    
+    setIsDeletingCategory(id);
+    try {
+      await deleteCategory(id);
+      alert('Kategoriya muvaffaqiyatli o\'chirildi!');
+    } catch (error) {
+      console.error('Error deleting category:', error);
+      alert('Kategoriya o\'chirilmadi. Xatolik: ' + (error as Error).message);
+    } finally {
+      setIsDeletingCategory(null);
     }
   };
 
@@ -797,6 +817,59 @@ export function ProductsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Kategoriyalar ro'yxati */}
+      {categories.length > 0 && (
+        <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-200">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
+              <Tag className="w-5 h-5 text-purple-600" />
+              <span>Kategoriyalar ({categories.length})</span>
+            </h2>
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {categories.map((category) => (
+              <div
+                key={category.id}
+                className="border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div
+                      className="w-4 h-4 rounded-full border border-gray-300"
+                      style={{ backgroundColor: category.color }}
+                    ></div>
+                    <div>
+                      <h3 className="font-medium text-gray-900">{category.name}</h3>
+                      {category.description && (
+                        <p className="text-sm text-gray-500">{category.description}</p>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <button
+                    onClick={() => handleDeleteCategory(category.id, category.name)}
+                    disabled={isDeletingCategory === category.id}
+                    className={`p-1 rounded-lg transition-colors ${
+                      isDeletingCategory === category.id
+                        ? 'bg-gray-100 cursor-not-allowed'
+                        : 'text-red-600 hover:bg-red-100'
+                    }`}
+                    title="Kategoriyani o'chirish"
+                  >
+                    {isDeletingCategory === category.id ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
