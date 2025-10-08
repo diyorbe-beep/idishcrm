@@ -12,6 +12,8 @@ export function ProductsPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCategorySubmitting, setIsCategorySubmitting] = useState(false);
   // const [uploadingImage, setUploadingImage] = useState(false);
   // const [previewImage, setPreviewImage] = useState<string | null>(null);
   // const fileInputRef = useRef<HTMLInputElement>(null);
@@ -76,6 +78,7 @@ export function ProductsPage() {
 
   const handleCategorySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsCategorySubmitting(true);
     
     try {
       if (editingCategory) {
@@ -86,6 +89,9 @@ export function ProductsPage() {
       resetCategoryForm();
     } catch (error) {
       console.error('Error saving category:', error);
+      alert('Kategoriya saqlanmadi. Xatolik: ' + (error as Error).message);
+    } finally {
+      setIsCategorySubmitting(false);
     }
   };
 
@@ -261,6 +267,7 @@ export function ProductsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     
     try {
       const productData = {
@@ -288,6 +295,8 @@ export function ProductsPage() {
     } catch (error) {
       console.error('Error saving product:', error);
       alert('Mahsulot saqlashda xatolik yuz berdi. Iltimos, qayta urinib ko\'ring.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -464,7 +473,10 @@ export function ProductsPage() {
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    disabled={isSubmitting}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                      isSubmitting ? 'bg-gray-100 cursor-not-allowed' : ''
+                    }`}
                     required
                   />
                 </div>
@@ -477,7 +489,10 @@ export function ProductsPage() {
                          type="text"
                          value={formData.brand}
                          onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
-                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                         className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                      isSubmitting ? 'bg-gray-100 cursor-not-allowed' : ''
+                    }`}
+                    disabled={isSubmitting}
                          required
                        />
                      </div>
@@ -490,7 +505,10 @@ export function ProductsPage() {
                          type="number"
                          value={formData.price}
                          onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                         className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                      isSubmitting ? 'bg-gray-100 cursor-not-allowed' : ''
+                    }`}
+                    disabled={isSubmitting}
                          placeholder="Mahsulot asosiy narxi"
                          required
                        />
@@ -533,7 +551,10 @@ export function ProductsPage() {
                     type="text"
                     value={formData.barcode}
                     onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                      isSubmitting ? 'bg-gray-100 cursor-not-allowed' : ''
+                    }`}
+                    disabled={isSubmitting}
                   />
                 </div>
 
@@ -545,7 +566,10 @@ export function ProductsPage() {
                     type="number"
                     value={formData.cost_price}
                     onChange={(e) => setFormData({ ...formData, cost_price: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                      isSubmitting ? 'bg-gray-100 cursor-not-allowed' : ''
+                    }`}
+                    disabled={isSubmitting}
                     placeholder="Mahsulot tannarxi"
                     required
                   />
@@ -559,7 +583,10 @@ export function ProductsPage() {
                     type="number"
                     value={formData.selling_price}
                     onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                      isSubmitting ? 'bg-gray-100 cursor-not-allowed' : ''
+                    }`}
+                    disabled={isSubmitting}
                     placeholder="Mijozga sotiladigan narx"
                     required
                   />
@@ -575,7 +602,10 @@ export function ProductsPage() {
                     max="100"
                     value={formData.discount}
                     onChange={(e) => setFormData({ ...formData, discount: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                      isSubmitting ? 'bg-gray-100 cursor-not-allowed' : ''
+                    }`}
+                    disabled={isSubmitting}
                   />
                 </div>
 
@@ -588,7 +618,10 @@ export function ProductsPage() {
                     min="0"
                     value={formData.quantity}
                     onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                      isSubmitting ? 'bg-gray-100 cursor-not-allowed' : ''
+                    }`}
+                    disabled={isSubmitting}
                     required
                   />
                 </div>
@@ -602,7 +635,10 @@ export function ProductsPage() {
                     min="0"
                     value={formData.min_quantity}
                     onChange={(e) => setFormData({ ...formData, min_quantity: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                      isSubmitting ? 'bg-gray-100 cursor-not-allowed' : ''
+                    }`}
+                    disabled={isSubmitting}
                     required
                   />
                 </div>
@@ -641,9 +677,17 @@ export function ProductsPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  disabled={isSubmitting}
+                  className={`px-4 py-2 rounded-lg transition-colors flex items-center space-x-2 ${
+                    isSubmitting 
+                      ? 'bg-gray-400 cursor-not-allowed' 
+                      : 'bg-blue-600 hover:bg-blue-700'
+                  } text-white`}
                 >
-                  {editingProduct ? 'Saqlash' : 'Qo\'shish'}
+                  {isSubmitting && (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  )}
+                  <span>{isSubmitting ? 'Saqlanmoqda...' : (editingProduct ? 'Saqlash' : 'Qo\'shish')}</span>
                 </button>
               </div>
             </form>
@@ -682,7 +726,10 @@ export function ProductsPage() {
                   type="text"
                   value={categoryFormData.name}
                   onChange={(e) => setCategoryFormData({ ...categoryFormData, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 ${
+                    isCategorySubmitting ? 'bg-gray-100 cursor-not-allowed' : ''
+                  }`}
+                  disabled={isCategorySubmitting}
                   placeholder="Masalan: Telefonlar"
                   required
                 />
@@ -696,7 +743,10 @@ export function ProductsPage() {
                   value={categoryFormData.description}
                   onChange={(e) => setCategoryFormData({ ...categoryFormData, description: e.target.value })}
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 ${
+                    isCategorySubmitting ? 'bg-gray-100 cursor-not-allowed' : ''
+                  }`}
+                  disabled={isCategorySubmitting}
                   placeholder="Kategoriya haqida qisqacha ma'lumot..."
                 ></textarea>
               </div>
@@ -710,7 +760,10 @@ export function ProductsPage() {
                     type="color"
                     value={categoryFormData.color}
                     onChange={(e) => setCategoryFormData({ ...categoryFormData, color: e.target.value })}
-                    className="w-12 h-10 border border-gray-300 rounded-lg cursor-pointer"
+                    className={`w-12 h-10 border border-gray-300 rounded-lg ${
+                      isCategorySubmitting ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
+                    }`}
+                    disabled={isCategorySubmitting}
                   />
                   <div 
                     className="w-8 h-8 rounded-lg border border-gray-300"
@@ -730,9 +783,17 @@ export function ProductsPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  disabled={isCategorySubmitting}
+                  className={`px-4 py-2 rounded-lg transition-colors flex items-center space-x-2 ${
+                    isCategorySubmitting 
+                      ? 'bg-gray-400 cursor-not-allowed' 
+                      : 'bg-green-600 hover:bg-green-700'
+                  } text-white`}
                 >
-                  {editingCategory ? 'Saqlash' : 'Qo\'shish'}
+                  {isCategorySubmitting && (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  )}
+                  <span>{isCategorySubmitting ? 'Saqlanmoqda...' : (editingCategory ? 'Saqlash' : 'Qo\'shish')}</span>
                 </button>
               </div>
             </form>
