@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Package, Plus, Search, Edit, Trash2, AlertCircle, Tag, X, Image as ImageIcon } from 'lucide-react';
 import { useData, Product } from '../../contexts/DataContext';
 import { useCategories, Category } from '../../contexts/CategoryContext';
@@ -15,6 +15,8 @@ export function ProductsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCategorySubmitting, setIsCategorySubmitting] = useState(false);
   const [isDeletingCategory, setIsDeletingCategory] = useState<string | null>(null);
+  const [showCategoryEditModal, setShowCategoryEditModal] = useState(false);
+  const [editingCategoryData, setEditingCategoryData] = useState<Category | null>(null);
   // const [uploadingImage, setUploadingImage] = useState(false);
   // const [previewImage, setPreviewImage] = useState<string | null>(null);
   // const fileInputRef = useRef<HTMLInputElement>(null);
@@ -40,12 +42,36 @@ export function ProductsPage() {
     color: '#3B82F6'
   });
 
-  const filteredProducts = products.filter(product =>
-    product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.barcode.includes(searchTerm)
-  );
+  const filteredProducts = products.filter(product => {
+    const searchLower = searchTerm.toLowerCase();
+    const matchesName = product.name.toLowerCase().includes(searchLower);
+    const matchesCategory = product.category.toLowerCase().includes(searchLower);
+    const matchesBrand = product.brand.toLowerCase().includes(searchLower);
+    const matchesBarcode = product.barcode.includes(searchTerm);
+    
+    // Debug uchun console.log qo'shamiz
+    if (searchTerm) {
+      console.log('Search term:', searchTerm);
+      console.log('Product:', product.name);
+      console.log('Matches:', { matchesName, matchesCategory, matchesBrand, matchesBarcode });
+    }
+    
+    return matchesName || matchesCategory || matchesBrand || matchesBarcode;
+  });
+
+  // Avtomatik hisoblash funksiyasi
+  useEffect(() => {
+    const quantity = parseFloat(formData.quantity) || 0;
+    const costPrice = parseFloat(formData.cost_price) || 0;
+    
+    if (quantity > 0 && costPrice > 0) {
+      const totalPrice = quantity * costPrice;
+      setFormData(prev => ({
+        ...prev,
+        price: totalPrice.toString()
+      }));
+    }
+  }, [formData.quantity, formData.cost_price]);
 
   const resetForm = () => {
     setFormData({
@@ -112,6 +138,50 @@ export function ProductsPage() {
       alert('Kategoriya o\'chirilmadi. Xatolik: ' + (error as Error).message);
     } finally {
       setIsDeletingCategory(null);
+    }
+  };
+
+  const handleCategoryEdit = (category: Category) => {
+    setEditingCategoryData(category);
+    setCategoryFormData({
+      name: category.name,
+      description: category.description || '',
+      color: category.color
+    });
+    setShowCategoryEditModal(true);
+  };
+
+  const handleCategoryUpdate = async (updateProducts: boolean = false) => {
+    if (!editingCategoryData) return;
+    
+    setIsCategorySubmitting(true);
+    try {
+      // Kategoriyani yangilash
+      await updateCategory(editingCategoryData.id, categoryFormData);
+      
+      // Agar mahsulotlarni ham yangilash kerak bo'lsa
+      if (updateProducts && categoryFormData.name !== editingCategoryData.name) {
+        // Bu kategoriyaga tegishli mahsulotlarni topish
+        const productsInCategory = products.filter(p => p.category === editingCategoryData.name);
+        
+        // Har bir mahsulotni yangilash
+        for (const product of productsInCategory) {
+          await updateProduct(product.id, {
+            ...product,
+            category: categoryFormData.name
+          });
+        }
+      }
+      
+      setShowCategoryEditModal(false);
+      setEditingCategoryData(null);
+      resetCategoryForm();
+      alert('Kategoriya muvaffaqiyatli yangilandi!');
+    } catch (error) {
+      console.error('Error updating category:', error);
+      alert('Kategoriya yangilanmadi. Xatolik: ' + (error as Error).message);
+    } finally {
+      setIsCategorySubmitting(false);
     }
   };
 
@@ -384,9 +454,91 @@ export function ProductsPage() {
         </div>
       </div>
 
+      {/* Qidiruv natijalari */}
+      {searchTerm && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+          <p className="text-blue-800 text-sm">
+            <strong>"{searchTerm}"</strong> bo'yicha qidiruv natijasi: 
+            <span className="ml-1 font-semibold">{filteredProducts.length} ta mahsulot topildi</span>
+          </p>
+        </div>
+      )}
+
+      {/* Kategoriyalar ro'yxati - kichik */}
+      {categories.length > 0 && (
+        <div className="bg-white rounded-xl p-3 shadow-sm border border-gray-200 mb-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-gray-900 flex items-center space-x-2">
+              <Tag className="w-4 h-4 text-purple-600" />
+              <span>Kategoriyalar ({categories.length})</span>
+            </h2>
+          </div>
+          
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
+            {categories.map((category) => (
+              <div
+                key={category.id}
+                className="border border-gray-200 rounded-lg p-2 hover:shadow-sm transition-shadow"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2 min-w-0 flex-1">
+                    <div
+                      className="w-3 h-3 rounded-full border border-gray-300 flex-shrink-0"
+                      style={{ backgroundColor: category.color }}
+                    ></div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-medium text-gray-900 text-xs truncate">{category.name}</h3>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-1 flex-shrink-0">
+                    <button
+                      onClick={() => handleCategoryEdit(category)}
+                      className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                      title="Kategoriyani tahrirlash"
+                    >
+                      <Edit className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteCategory(category.id, category.name)}
+                      disabled={isDeletingCategory === category.id}
+                      className={`p-1 rounded transition-colors ${
+                        isDeletingCategory === category.id
+                          ? 'bg-gray-100 cursor-not-allowed'
+                          : 'text-red-600 hover:bg-red-100'
+                      }`}
+                      title="Kategoriyani o'chirish"
+                    >
+                      {isDeletingCategory === category.id ? (
+                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-red-600"></div>
+                      ) : (
+                        <Trash2 className="w-3 h-3" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Products Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredProducts.map((product) => (
+      {filteredProducts.length === 0 && searchTerm ? (
+        <div className="text-center py-12">
+          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Search className="w-8 h-8 text-gray-400" />
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Hech narsa topilmadi</h3>
+          <p className="text-gray-500">
+            <strong>"{searchTerm}"</strong> bo'yicha hech qanday mahsulot topilmadi.
+            <br />
+            Boshqa kalit so'zlar bilan qayta urinib ko'ring.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredProducts.map((product) => (
           <div key={product.id} className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center space-x-3">
@@ -458,8 +610,9 @@ export function ProductsPage() {
               </div>
             </div>
           </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Add/Edit Product Modal */}
       {showAddForm && (
@@ -524,14 +677,13 @@ export function ProductsPage() {
                        <input
                          type="number"
                          value={formData.price}
-                         onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                         className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                      isSubmitting ? 'bg-gray-100 cursor-not-allowed' : ''
-                    }`}
-                    disabled={isSubmitting}
-                         placeholder="Mahsulot asosiy narxi"
-                         required
+                         readOnly
+                         className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 cursor-not-allowed text-gray-700"
+                         placeholder="Miqdor × Tannarx = Asosiy narx"
                        />
+                       <p className="text-xs text-gray-500 mt-1">
+                         💡 Avtomatik hisoblanadi: Miqdor × Tannarx
+                       </p>
                      </div>
 
                 <div>
@@ -590,9 +742,12 @@ export function ProductsPage() {
                       isSubmitting ? 'bg-gray-100 cursor-not-allowed' : ''
                     }`}
                     disabled={isSubmitting}
-                    placeholder="Mahsulot tannarxi"
+                    placeholder="Bitta mahsulot tannarxi"
                     required
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    💰 Bitta mahsulot uchun tannarx
+                  </p>
                 </div>
 
                 <div>
@@ -642,8 +797,12 @@ export function ProductsPage() {
                       isSubmitting ? 'bg-gray-100 cursor-not-allowed' : ''
                     }`}
                     disabled={isSubmitting}
+                    placeholder="Mahsulot miqdori"
                     required
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    📦 Mahsulot soni (ta)
+                  </p>
                 </div>
 
                 <div>
@@ -821,55 +980,142 @@ export function ProductsPage() {
         </div>
       )}
 
-      {/* Kategoriyalar ro'yxati */}
-      {categories.length > 0 && (
-        <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-200">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
-              <Tag className="w-5 h-5 text-purple-600" />
-              <span>Kategoriyalar ({categories.length})</span>
-            </h2>
-          </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {categories.map((category) => (
-              <div
-                key={category.id}
-                className="border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div
-                      className="w-4 h-4 rounded-full border border-gray-300"
-                      style={{ backgroundColor: category.color }}
-                    ></div>
-                    <div>
-                      <h3 className="font-medium text-gray-900">{category.name}</h3>
-                      {category.description && (
-                        <p className="text-sm text-gray-500">{category.description}</p>
-                      )}
+
+      {/* Kategoriya Tahrirlash Modal */}
+      {showCategoryEditModal && editingCategoryData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-semibold text-gray-900 flex items-center space-x-2">
+                  <Edit className="w-5 h-5 text-blue-600" />
+                  <span>Kategoriyani tahrirlash</span>
+                </h2>
+                <button
+                  onClick={() => setShowCategoryEditModal(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <form onSubmit={(e) => e.preventDefault()}>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Kategoriya nomi *
+                    </label>
+                    <input
+                      type="text"
+                      value={categoryFormData.name}
+                      onChange={(e) => setCategoryFormData({ ...categoryFormData, name: e.target.value })}
+                      className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        isCategorySubmitting ? 'bg-gray-100 cursor-not-allowed' : ''
+                      }`}
+                      disabled={isCategorySubmitting}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Tavsif
+                    </label>
+                    <textarea
+                      value={categoryFormData.description}
+                      onChange={(e) => setCategoryFormData({ ...categoryFormData, description: e.target.value })}
+                      rows={3}
+                      className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        isCategorySubmitting ? 'bg-gray-100 cursor-not-allowed' : ''
+                      }`}
+                      disabled={isCategorySubmitting}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Rang
+                    </label>
+                    <div className="flex items-center space-x-3">
+                      <input
+                        type="color"
+                        value={categoryFormData.color}
+                        onChange={(e) => setCategoryFormData({ ...categoryFormData, color: e.target.value })}
+                        className={`w-12 h-10 border border-gray-300 rounded-lg ${
+                          isCategorySubmitting ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
+                        }`}
+                        disabled={isCategorySubmitting}
+                      />
+                      <div 
+                        className="w-8 h-8 rounded-lg border border-gray-300"
+                        style={{ backgroundColor: categoryFormData.color }}
+                      ></div>
+                      <span className="text-sm text-gray-600">{categoryFormData.color}</span>
                     </div>
                   </div>
-                  
-                  <button
-                    onClick={() => handleDeleteCategory(category.id, category.name)}
-                    disabled={isDeletingCategory === category.id}
-                    className={`p-1 rounded-lg transition-colors ${
-                      isDeletingCategory === category.id
-                        ? 'bg-gray-100 cursor-not-allowed'
-                        : 'text-red-600 hover:bg-red-100'
-                    }`}
-                    title="Kategoriyani o'chirish"
-                  >
-                    {isDeletingCategory === category.id ? (
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
-                    ) : (
-                      <Trash2 className="w-4 h-4" />
-                    )}
-                  </button>
+
+                  {/* Mahsulotlarni yangilash haqida ogohlantirish */}
+                  {categoryFormData.name !== editingCategoryData.name && (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                      <div className="flex items-start space-x-3">
+                        <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5" />
+                        <div>
+                          <h4 className="text-sm font-medium text-yellow-800">Diqqat!</h4>
+                          <p className="text-sm text-yellow-700 mt-1">
+                            Kategoriya nomini o'zgartirsangiz, bu kategoriyaga tegishli barcha mahsulotlarning kategoriyasi ham yangilanadi.
+                            <br />
+                            <strong>Bu kategoriyada {products.filter(p => p.category === editingCategoryData.name).length} ta mahsulot mavjud.</strong>
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+
+                <div className="flex justify-end space-x-4 pt-6">
+                  <button
+                    type="button"
+                    onClick={() => setShowCategoryEditModal(false)}
+                    className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
+                    disabled={isCategorySubmitting}
+                  >
+                    Bekor qilish
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleCategoryUpdate(false)}
+                    disabled={isCategorySubmitting}
+                    className={`px-4 py-2 rounded-lg transition-colors flex items-center space-x-2 ${
+                      isCategorySubmitting 
+                        ? 'bg-gray-400 cursor-not-allowed' 
+                        : 'bg-blue-600 hover:bg-blue-700'
+                    } text-white`}
+                  >
+                    {isCategorySubmitting && (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    )}
+                    <span>{isCategorySubmitting ? 'Saqlanmoqda...' : 'Kategoriyani saqlash'}</span>
+                  </button>
+                  {categoryFormData.name !== editingCategoryData.name && (
+                    <button
+                      type="button"
+                      onClick={() => handleCategoryUpdate(true)}
+                      disabled={isCategorySubmitting}
+                      className={`px-4 py-2 rounded-lg transition-colors flex items-center space-x-2 ${
+                        isCategorySubmitting 
+                          ? 'bg-gray-400 cursor-not-allowed' 
+                          : 'bg-green-600 hover:bg-green-700'
+                      } text-white`}
+                    >
+                      {isCategorySubmitting && (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      )}
+                      <span>{isCategorySubmitting ? 'Saqlanmoqda...' : 'Kategoriya va mahsulotlarni yangilash'}</span>
+                    </button>
+                  )}
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}

@@ -19,6 +19,9 @@ export function SalesPage() {
   const [selectedCustomer, setSelectedCustomer] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'naqd' | 'karta' | 'online'>('naqd');
   const [showPayment, setShowPayment] = useState(false);
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<typeof products[0] | null>(null);
+  const [modalQuantity, setModalQuantity] = useState(1);
 
   const filteredProducts = products.filter(product =>
     product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -37,13 +40,13 @@ export function SalesPage() {
     }
   }, [searchTerm, products]);
 
-  const addToCart = (product: typeof products[0]) => {
+  const addToCart = (product: typeof products[0], quantity: number = 1) => {
     const existingItem = cart.find(item => item.product_id === product.id);
     
     if (existingItem) {
       setCart(cart.map(item =>
         item.product_id === product.id
-          ? { ...item, quantity: item.quantity + 1 }
+          ? { ...item, quantity: item.quantity + quantity }
           : item
       ));
     } else {
@@ -51,9 +54,24 @@ export function SalesPage() {
         product_id: product.id,
         name: product.name,
         price: product.selling_price,
-        quantity: 1,
+        quantity: quantity,
         discount: product.discount
       }]);
+    }
+  };
+
+  const handleProductClick = (product: typeof products[0]) => {
+    setSelectedProduct(product);
+    setModalQuantity(1);
+    setShowProductModal(true);
+  };
+
+  const handleAddToCartFromModal = () => {
+    if (selectedProduct) {
+      addToCart(selectedProduct, modalQuantity);
+      setShowProductModal(false);
+      setSelectedProduct(null);
+      setModalQuantity(1);
     }
   };
 
@@ -146,7 +164,7 @@ export function SalesPage() {
           {filteredProducts.map((product) => (
             <div
               key={product.id}
-              onClick={() => addToCart(product)}
+              onClick={() => handleProductClick(product)}
               className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 cursor-pointer hover:shadow-md transition-shadow"
             >
               <h3 className="font-semibold text-gray-900 mb-1">{product.name}</h3>
@@ -305,6 +323,129 @@ export function SalesPage() {
           </div>
         )}
       </div>
+
+      {/* Mahsulot Modal */}
+      {showProductModal && selectedProduct && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-semibold text-gray-900 flex items-center space-x-2">
+                  <ShoppingCart className="w-5 h-5 text-blue-600" />
+                  <span>Mahsulot ma'lumotlari</span>
+                </h2>
+                <button
+                  onClick={() => setShowProductModal(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {/* Mahsulot ma'lumotlari */}
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h3 className="font-semibold text-gray-900 mb-2">{selectedProduct.name}</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Brend:</span>
+                      <span className="font-medium">{selectedProduct.brand}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Kategoriya:</span>
+                      <span className="font-medium">{selectedProduct.category}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Mavjud:</span>
+                      <span className="font-medium">{selectedProduct.quantity} ta</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Narx:</span>
+                      <span className="font-bold text-green-600 text-lg">
+                        {formatPrice(selectedProduct.selling_price)} so'm
+                      </span>
+                    </div>
+                    {selectedProduct.discount > 0 && (
+                      <div className="flex justify-between text-red-600">
+                        <span>Chegirma:</span>
+                        <span className="font-medium">-{selectedProduct.discount}%</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Miqdor tanlash */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Miqdor
+                  </label>
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={() => setModalQuantity(Math.max(1, modalQuantity - 1))}
+                      className="w-10 h-10 bg-gray-100 border border-gray-300 rounded-lg flex items-center justify-center hover:bg-gray-200 transition-colors"
+                    >
+                      <Minus className="w-4 h-4" />
+                    </button>
+                    <input
+                      type="number"
+                      min="1"
+                      max={selectedProduct.quantity}
+                      value={modalQuantity}
+                      onChange={(e) => setModalQuantity(Math.max(1, Math.min(selectedProduct.quantity, parseInt(e.target.value) || 1)))}
+                      className="w-20 text-center px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <button
+                      onClick={() => setModalQuantity(Math.min(selectedProduct.quantity, modalQuantity + 1))}
+                      className="w-10 h-10 bg-gray-100 border border-gray-300 rounded-lg flex items-center justify-center hover:bg-gray-200 transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Maksimal: {selectedProduct.quantity} ta
+                  </p>
+                </div>
+
+                {/* Jami narx */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-blue-800">Jami:</span>
+                    <span className="text-xl font-bold text-blue-900">
+                      {formatPrice(selectedProduct.selling_price * modalQuantity)} so'm
+                    </span>
+                  </div>
+                  {selectedProduct.discount > 0 && (
+                    <div className="flex justify-between items-center mt-2">
+                      <span className="text-xs text-blue-600">Chegirma ({selectedProduct.discount}%):</span>
+                      <span className="text-sm font-medium text-red-600">
+                        -{formatPrice((selectedProduct.selling_price * modalQuantity * selectedProduct.discount) / 100)} so'm
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-4 pt-6">
+                <button
+                  type="button"
+                  onClick={() => setShowProductModal(false)}
+                  className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
+                >
+                  Bekor qilish
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAddToCartFromModal}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center space-x-2"
+                >
+                  <ShoppingCart className="w-4 h-4" />
+                  <span>Savatga qo'shish</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
