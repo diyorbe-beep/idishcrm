@@ -8,6 +8,7 @@ export function ProductsPage() {
   const { products, addProduct, updateProduct, deleteProduct } = useData();
   const { categories, addCategory, updateCategory, deleteCategory } = useCategories();
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [showCategoryForm, setShowCategoryForm] = useState(false);
@@ -17,6 +18,7 @@ export function ProductsPage() {
   const [isDeletingCategory, setIsDeletingCategory] = useState<string | null>(null);
   const [showCategoryEditModal, setShowCategoryEditModal] = useState(false);
   const [editingCategoryData, setEditingCategoryData] = useState<Category | null>(null);
+  const [showCategoriesModal, setShowCategoriesModal] = useState(false);
   // const [uploadingImage, setUploadingImage] = useState(false);
   // const [previewImage, setPreviewImage] = useState<string | null>(null);
   // const fileInputRef = useRef<HTMLInputElement>(null);
@@ -49,14 +51,12 @@ export function ProductsPage() {
     const matchesBrand = product.brand.toLowerCase().includes(searchLower);
     const matchesBarcode = product.barcode.includes(searchTerm);
     
-    // Debug uchun console.log qo'shamiz
-    if (searchTerm) {
-      console.log('Search term:', searchTerm);
-      console.log('Product:', product.name);
-      console.log('Matches:', { matchesName, matchesCategory, matchesBrand, matchesBarcode });
-    }
+    const matchesSearch = matchesName || matchesCategory || matchesBrand || matchesBarcode;
     
-    return matchesName || matchesCategory || matchesBrand || matchesBarcode;
+    // Kategoriya filteri
+    const matchesCategoryFilter = selectedCategory === 'all' || product.category === selectedCategory;
+    
+    return matchesSearch && matchesCategoryFilter;
   });
 
   // Avtomatik hisoblash funksiyasi
@@ -424,11 +424,11 @@ export function ProductsPage() {
         </div>
         <div className="mt-4 sm:mt-0 flex space-x-3">
           <button
-            onClick={() => setShowCategoryForm(true)}
-            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center space-x-2 transition-colors"
+            onClick={() => setShowCategoriesModal(true)}
+            className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 flex items-center space-x-2 transition-colors"
           >
             <Tag className="w-5 h-5" />
-            <span>Kategoriya qo'shish</span>
+            <span>Kategoriyalar</span>
           </button>
           <button
             onClick={() => setShowAddForm(true)}
@@ -454,86 +454,86 @@ export function ProductsPage() {
         </div>
       </div>
 
+      {/* Categories Filter */}
+      <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
+        <div className="flex items-center space-x-2 mb-3">
+          <Tag className="w-5 h-5 text-gray-600" />
+          <h3 className="text-sm font-medium text-gray-700">Kategoriyalar</h3>
+        </div>
+        <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide">
+          <button
+            onClick={() => setSelectedCategory('all')}
+            className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+              selectedCategory === 'all'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            Barchasi ({products.length})
+          </button>
+          {categories.map((category) => {
+            const categoryProductCount = products.filter(p => p.category === category.name).length;
+            return (
+              <button
+                key={category.id}
+                onClick={() => setSelectedCategory(category.name)}
+                className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                  selectedCategory === category.name
+                    ? 'text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+                style={{ backgroundColor: selectedCategory === category.name ? category.color : undefined }}
+              >
+                {category.name} ({categoryProductCount})
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Qidiruv natijalari */}
-      {searchTerm && (
+      {(searchTerm || selectedCategory !== 'all') && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
           <p className="text-blue-800 text-sm">
-            <strong>"{searchTerm}"</strong> bo'yicha qidiruv natijasi: 
-            <span className="ml-1 font-semibold">{filteredProducts.length} ta mahsulot topildi</span>
+            {searchTerm && (
+              <>
+                <strong>"{searchTerm}"</strong> bo'yicha qidiruv natijasi
+                {selectedCategory !== 'all' && ' va '}
+              </>
+            )}
+            {selectedCategory !== 'all' && (
+              <>
+                <strong>"{selectedCategory}"</strong> kategoriyasi
+              </>
+            )}
+            : <span className="ml-1 font-semibold">{filteredProducts.length} ta mahsulot topildi</span>
           </p>
         </div>
       )}
 
-      {/* Kategoriyalar ro'yxati - kichik */}
-      {categories.length > 0 && (
-        <div className="bg-white rounded-xl p-3 shadow-sm border border-gray-200 mb-4">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-gray-900 flex items-center space-x-2">
-              <Tag className="w-4 h-4 text-purple-600" />
-              <span>Kategoriyalar ({categories.length})</span>
-            </h2>
-          </div>
-          
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
-            {categories.map((category) => (
-              <div
-                key={category.id}
-                className="border border-gray-200 rounded-lg p-2 hover:shadow-sm transition-shadow"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2 min-w-0 flex-1">
-                    <div
-                      className="w-3 h-3 rounded-full border border-gray-300 flex-shrink-0"
-                      style={{ backgroundColor: category.color }}
-                    ></div>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="font-medium text-gray-900 text-xs truncate">{category.name}</h3>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center space-x-1 flex-shrink-0">
-                    <button
-                      onClick={() => handleCategoryEdit(category)}
-                      className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
-                      title="Kategoriyani tahrirlash"
-                    >
-                      <Edit className="w-3 h-3" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteCategory(category.id, category.name)}
-                      disabled={isDeletingCategory === category.id}
-                      className={`p-1 rounded transition-colors ${
-                        isDeletingCategory === category.id
-                          ? 'bg-gray-100 cursor-not-allowed'
-                          : 'text-red-600 hover:bg-red-100'
-                      }`}
-                      title="Kategoriyani o'chirish"
-                    >
-                      {isDeletingCategory === category.id ? (
-                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-red-600"></div>
-                      ) : (
-                        <Trash2 className="w-3 h-3" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Products Grid */}
-      {filteredProducts.length === 0 && searchTerm ? (
+      {filteredProducts.length === 0 && (searchTerm || selectedCategory !== 'all') ? (
         <div className="text-center py-12">
           <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <Search className="w-8 h-8 text-gray-400" />
           </div>
           <h3 className="text-lg font-medium text-gray-900 mb-2">Hech narsa topilmadi</h3>
           <p className="text-gray-500">
-            <strong>"{searchTerm}"</strong> bo'yicha hech qanday mahsulot topilmadi.
+            {searchTerm && (
+              <>
+                <strong>"{searchTerm}"</strong> bo'yicha
+                {selectedCategory !== 'all' && ' va '}
+              </>
+            )}
+            {selectedCategory !== 'all' && (
+              <>
+                <strong>"{selectedCategory}"</strong> kategoriyasida
+              </>
+            )}
+            {' '}hech qanday mahsulot topilmadi.
             <br />
-            Boshqa kalit so'zlar bilan qayta urinib ko'ring.
+            Boshqa kalit so'zlar yoki kategoriya bilan qayta urinib ko'ring.
           </p>
         </div>
       ) : (
@@ -1115,6 +1115,106 @@ export function ProductsPage() {
                   )}
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Kategoriyalar Modal */}
+      {showCategoriesModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-semibold text-gray-900 flex items-center space-x-2">
+                  <Tag className="w-6 h-6 text-purple-600" />
+                  <span>Kategoriyalar ({categories.length})</span>
+                </h2>
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => setShowCategoryForm(true)}
+                    className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center space-x-2 transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Kategoriya qo'shish</span>
+                  </button>
+                  <button
+                    onClick={() => setShowCategoriesModal(false)}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+              </div>
+
+              {categories.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Tag className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Kategoriyalar yo'q</h3>
+                  <p className="text-gray-500 mb-4">Birinchi kategoriyani qo'shing</p>
+                  <button
+                    onClick={() => setShowCategoryForm(true)}
+                    className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center space-x-2 transition-colors mx-auto"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Kategoriya qo'shish</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {categories.map((category) => (
+                    <div
+                      key={category.id}
+                      className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                    >
+                      <div className="flex flex-col space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3 flex-1 min-w-0">
+                            <div
+                              className="w-4 h-4 rounded-full border border-gray-300 flex-shrink-0"
+                              style={{ backgroundColor: category.color }}
+                            ></div>
+                            <div className="min-w-0 flex-1">
+                              <h3 className="font-medium text-gray-900 text-sm break-words">{category.name}</h3>
+                              {category.description && (
+                                <p className="text-xs text-gray-500 break-words mt-1">{category.description}</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center justify-end space-x-2">
+                          <button
+                            onClick={() => handleCategoryEdit(category)}
+                            className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                            title="Kategoriyani tahrirlash"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteCategory(category.id, category.name)}
+                            disabled={isDeletingCategory === category.id}
+                            className={`p-2 rounded-lg transition-colors ${
+                              isDeletingCategory === category.id
+                                ? 'bg-gray-100 cursor-not-allowed'
+                                : 'text-red-600 hover:bg-red-100'
+                            }`}
+                            title="Kategoriyani o'chirish"
+                          >
+                            {isDeletingCategory === category.id ? (
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

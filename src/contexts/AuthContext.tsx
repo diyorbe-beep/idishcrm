@@ -14,6 +14,7 @@ interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
+  updateProfile: (profileData: Partial<User>) => Promise<boolean>;
   loading: boolean;
 }
 
@@ -78,13 +79,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updateProfile = async (profileData: Partial<User>): Promise<boolean> => {
+    try {
+      if (!user) return false;
+
+      setLoading(true);
+      
+      // Update user in Supabase
+      const { error } = await supabase
+        .from('users')
+        .update(profileData)
+        .eq('id', user.id);
+      
+      if (error) {
+        console.error('Profile update error:', error);
+        return false;
+      }
+
+      // Update local state and localStorage
+      const updatedUser = { ...user, ...profileData };
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+
+      return true;
+    } catch (error) {
+      console.error('Profile update error:', error);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const logout = () => {
     setUser(null);
     localStorage.removeItem('user');
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, logout, updateProfile, loading }}>
       {children}
     </AuthContext.Provider>
   );

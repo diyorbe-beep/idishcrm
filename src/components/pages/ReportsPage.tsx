@@ -1,23 +1,120 @@
-import React, { useState } from 'react';
-import { BarChart3, TrendingUp, DollarSign, Package, Users, Calendar, Download } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { BarChart3, TrendingUp, DollarSign, Package, Users, Calendar, Download, Filter, RefreshCw, Eye, FileText, PieChart, Activity, ArrowUpRight, ArrowDownRight, Minus, TrendingDown, AlertTriangle } from 'lucide-react';
 import { useData } from '../../contexts/DataContext';
+import * as XLSX from 'xlsx';
 
 export function ReportsPage() {
   const { products, customers, sales } = useData();
   const [selectedPeriod, setSelectedPeriod] = useState('today');
+  const [isLoading, setIsLoading] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [selectedDateRange, setSelectedDateRange] = useState({
+    start: '',
+    end: ''
+  });
+  const [viewMode, setViewMode] = useState<'overview' | 'detailed'>('overview');
 
   const periods = [
-    { value: 'today', label: 'Bugun' },
-    { value: 'week', label: 'Bu hafta' },
-    { value: 'month', label: 'Bu oy' },
-    { value: 'year', label: 'Bu yil' }
+    { value: 'today', label: 'Bugun', icon: Calendar },
+    { value: 'week', label: 'Bu hafta', icon: Calendar },
+    { value: 'month', label: 'Bu oy', icon: Calendar },
+    { value: 'year', label: 'Bu yil', icon: Calendar },
+    { value: 'custom', label: 'Maxsus', icon: Calendar }
   ];
+
+  // Refresh data function
+  const refreshData = async () => {
+    setIsLoading(true);
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setIsLoading(false);
+  };
+
+  // Export data function
+  const exportData = () => {
+    // Create workbook
+    const workbook = XLSX.utils.book_new();
+    
+    // 1. Sales Data Sheet
+    const salesData = filteredSales.map(sale => {
+      const customer = customers.find(c => c.id === sale.customer_id);
+      return {
+        'ID': sale.id,
+        'Mijoz': customer?.name || 'Noma\'lum',
+        'Telefon': customer?.phone || '',
+        'Jami': sale.total,
+        'To\'lov usuli': sale.payment_method === 'naqd' ? 'Naqd' : sale.payment_method === 'karta' ? 'Karta' : 'Online',
+        'Sana': new Date(sale.created_at).toLocaleDateString('uz-UZ'),
+        'Vaqt': new Date(sale.created_at).toLocaleTimeString('uz-UZ'),
+        'Mahsulotlar soni': sale.items && Array.isArray(sale.items) ? sale.items.length : 0,
+        'Jami dona': sale.items && Array.isArray(sale.items) ? sale.items.reduce((sum, item) => sum + item.quantity, 0) : 0
+      };
+    });
+    
+    const salesSheet = XLSX.utils.json_to_sheet(salesData);
+    XLSX.utils.book_append_sheet(workbook, salesSheet, 'Savdolar');
+    
+    // 2. Top Products Sheet
+    const topProductsData = topProducts.map((item, index) => ({
+      'O\'rin': index + 1,
+      'Mahsulot': item.product?.name || 'Noma\'lum',
+      'Kategoriya': item.product?.category || '',
+      'Sotilgan miqdor': item.quantity,
+      'Narx': item.product?.selling_price || 0,
+      'Jami summa': (item.product?.selling_price || 0) * item.quantity
+    }));
+    
+    const productsSheet = XLSX.utils.json_to_sheet(topProductsData);
+    XLSX.utils.book_append_sheet(workbook, productsSheet, 'Top Mahsulotlar');
+    
+    // 3. Statistics Sheet
+    const statsData = [
+      { 'Ko\'rsatkich': 'Jami daromad', 'Qiymat': totalRevenue, 'Birlik': 'so\'m' },
+      { 'Ko\'rsatkich': 'Jami savdolar', 'Qiymat': totalTransactions, 'Birlik': 'ta' },
+      { 'Ko\'rsatkich': 'O\'rtacha savdo', 'Qiymat': averageTransaction, 'Birlik': 'so\'m' },
+      { 'Ko\'rsatkich': 'Foyda/Zarar', 'Qiymat': profit, 'Birlik': 'so\'m' },
+      { 'Ko\'rsatkich': 'Foyda marjasi', 'Qiymat': profitMargin, 'Birlik': '%' },
+      { 'Ko\'rsatkich': 'Jami tannarx', 'Qiymat': totalCost, 'Birlik': 'so\'m' },
+      { 'Ko\'rsatkich': 'Sotilgan mahsulotlar', 'Qiymat': totalProductsSold, 'Birlik': 'dona' },
+      { 'Ko\'rsatkich': 'Faol mijozlar', 'Qiymat': uniqueCustomers, 'Birlik': 'ta' }
+    ];
+    
+    const statsSheet = XLSX.utils.json_to_sheet(statsData);
+    XLSX.utils.book_append_sheet(workbook, statsSheet, 'Statistika');
+    
+    // 4. Payment Methods Sheet
+    const paymentMethods = filteredSales.reduce((acc, sale) => {
+      const method = sale.payment_method === 'naqd' ? 'Naqd' : sale.payment_method === 'karta' ? 'Karta' : 'Online';
+      acc[method] = (acc[method] || 0) + sale.total;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    const paymentData = Object.entries(paymentMethods).map(([method, amount]) => ({
+      'To\'lov usuli': method,
+      'Jami summa': amount,
+      'Foiz': totalRevenue > 0 ? ((amount / totalRevenue) * 100).toFixed(1) : 0
+    }));
+    
+    const paymentSheet = XLSX.utils.json_to_sheet(paymentData);
+    XLSX.utils.book_append_sheet(workbook, paymentSheet, 'To\'lov usullari');
+    
+    // Save file
+    const fileName = `hisobot-${selectedPeriod}-${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
+  };
 
   // Calculate stats based on selected period
   const getFilteredSales = () => {
     const now = new Date();
     return sales.filter(sale => {
       const saleDate = new Date(sale.created_at);
+      
+      if (selectedPeriod === 'custom' && selectedDateRange.start && selectedDateRange.end) {
+        const startDate = new Date(selectedDateRange.start);
+        const endDate = new Date(selectedDateRange.end);
+        return saleDate >= startDate && saleDate <= endDate;
+      }
+      
       switch (selectedPeriod) {
         case 'today':
           return saleDate.toDateString() === now.toDateString();
@@ -39,13 +136,87 @@ export function ReportsPage() {
   const totalTransactions = filteredSales.length;
   const averageTransaction = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
 
+  // Calculate profit/loss
+  const calculateProfit = () => {
+    let totalCost = 0;
+    let totalRevenue = 0;
+    
+    filteredSales.forEach(sale => {
+      // Check if sale.items exists and is an array
+      if (sale.items && Array.isArray(sale.items)) {
+        sale.items.forEach(item => {
+          const product = products.find(p => p.id === item.product_id);
+          if (product) {
+            totalCost += product.cost_price * item.quantity;
+            totalRevenue += product.selling_price * item.quantity;
+          }
+        });
+      }
+    });
+    
+    return {
+      cost: totalCost,
+      revenue: totalRevenue,
+      profit: totalRevenue - totalCost,
+      margin: totalRevenue > 0 ? ((totalRevenue - totalCost) / totalRevenue) * 100 : 0
+    };
+  };
+
+  const profitData = calculateProfit();
+  const profit = profitData.profit;
+  const profitMargin = profitData.margin;
+  const totalCost = profitData.cost;
+
+  // Additional statistics
+  const totalProductsSold = filteredSales.reduce((sum, sale) => {
+    if (sale.items && Array.isArray(sale.items)) {
+      return sum + sale.items.reduce((itemSum, item) => itemSum + item.quantity, 0);
+    }
+    return sum;
+  }, 0);
+  
+  const uniqueCustomers = new Set(filteredSales.map(sale => sale.customer_id)).size;
+  
+  // Previous period comparison
+  const getPreviousPeriodSales = () => {
+    const now = new Date();
+    return sales.filter(sale => {
+      const saleDate = new Date(sale.created_at);
+      switch (selectedPeriod) {
+        case 'today':
+          const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+          return saleDate.toDateString() === yesterday.toDateString();
+        case 'week':
+          const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+          const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          return saleDate >= twoWeeksAgo && saleDate < oneWeekAgo;
+        case 'month':
+          const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+          const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+          return saleDate >= lastMonth && saleDate < thisMonth;
+        case 'year':
+          return saleDate.getFullYear() === now.getFullYear() - 1;
+        default:
+          return false;
+      }
+    });
+  };
+
+  const previousSales = getPreviousPeriodSales();
+  const previousRevenue = previousSales.reduce((sum, sale) => sum + sale.total, 0);
+  const revenueChange = previousRevenue > 0 ? ((totalRevenue - previousRevenue) / previousRevenue) * 100 : 0;
+  const transactionChange = previousSales.length > 0 ? ((totalTransactions - previousSales.length) / previousSales.length) * 100 : 0;
+
   // Top selling products
   const productSales = new Map();
   filteredSales.forEach(sale => {
-    sale.items.forEach(item => {
-      const current = productSales.get(item.product_id) || 0;
-      productSales.set(item.product_id, current + item.quantity);
-    });
+    // Check if sale.items exists and is an array
+    if (sale.items && Array.isArray(sale.items)) {
+      sale.items.forEach(item => {
+        const current = productSales.get(item.product_id) || 0;
+        productSales.set(item.product_id, current + item.quantity);
+      });
+    }
   });
 
   const topProducts = Array.from(productSales.entries())
@@ -61,76 +232,230 @@ export function ReportsPage() {
     return new Intl.NumberFormat('uz-UZ').format(price);
   };
 
+  const formatPercentage = (value: number) => {
+    return `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`;
+  };
+
+  const getChangeIcon = (value: number) => {
+    if (value > 0) return <ArrowUpRight className="w-4 h-4 text-green-600" />;
+    if (value < 0) return <ArrowDownRight className="w-4 h-4 text-red-600" />;
+    return <Minus className="w-4 h-4 text-gray-600" />;
+  };
+
+  const getChangeColor = (value: number) => {
+    if (value > 0) return 'text-green-600';
+    if (value < 0) return 'text-red-600';
+    return 'text-gray-600';
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Hisobotlar va Analitika</h1>
-          <p className="text-gray-600">Biznes statistikasi va ko'rsatkichlar</p>
+          <h1 className="text-3xl font-bold text-gray-900">Hisobotlar va Analitika</h1>
+          <p className="text-gray-600 mt-1">Biznes statistikasi va ko'rsatkichlar</p>
         </div>
-        <div className="flex items-center space-x-4 mt-4 sm:mt-0">
-          <select
-            value={selectedPeriod}
-            onChange={(e) => setSelectedPeriod(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          >
-            {periods.map(period => (
-              <option key={period.value} value={period.value}>
-                {period.label}
-              </option>
-            ))}
-          </select>
-          <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center space-x-2 transition-colors">
-            <Download className="w-4 h-4" />
-            <span>Export</span>
-          </button>
+        
+        <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 mt-6 lg:mt-0">
+          {/* View Mode Toggle */}
+          <div className="flex bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode('overview')}
+              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                viewMode === 'overview'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <Eye className="w-4 h-4 inline mr-2" />
+              Umumiy
+            </button>
+            <button
+              onClick={() => setViewMode('detailed')}
+              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                viewMode === 'detailed'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <FileText className="w-4 h-4 inline mr-2" />
+              Batafsil
+            </button>
+          </div>
+
+          {/* Period Selector */}
+          <div className="flex items-center space-x-2">
+            <Filter className="w-4 h-4 text-gray-500" />
+            <select
+              value={selectedPeriod}
+              onChange={(e) => setSelectedPeriod(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+            >
+              {periods.map(period => {
+                const Icon = period.icon;
+                return (
+                  <option key={period.value} value={period.value}>
+                    {period.label}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+
+          {/* Custom Date Range */}
+          {selectedPeriod === 'custom' && (
+            <div className="flex items-center space-x-2">
+              <input
+                type="date"
+                value={selectedDateRange.start}
+                onChange={(e) => setSelectedDateRange(prev => ({ ...prev, start: e.target.value }))}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+              <span className="text-gray-500">-</span>
+              <input
+                type="date"
+                value={selectedDateRange.end}
+                onChange={(e) => setSelectedDateRange(prev => ({ ...prev, end: e.target.value }))}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={refreshData}
+              disabled={isLoading}
+              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+              title="Yangilash"
+            >
+              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+            </button>
+            <button
+              onClick={exportData}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center space-x-2 transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              <span>Export</span>
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+        {/* Total Revenue */}
+        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 shadow-sm border border-green-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Jami daromad</p>
-              <p className="text-2xl font-bold text-gray-900">{formatPrice(totalRevenue)} so'm</p>
-              <p className="text-sm text-green-600 mt-1">+12% oldingi davr bilan</p>
+              <p className="text-sm text-green-700 font-medium">Jami daromad</p>
+              <p className="text-3xl font-bold text-green-900 mt-1">{formatPrice(totalRevenue)} so'm</p>
+              <div className="flex items-center mt-2">
+                {getChangeIcon(revenueChange)}
+                <span className={`text-sm font-medium ml-1 ${getChangeColor(revenueChange)}`}>
+                  {formatPercentage(revenueChange)} oldingi davr bilan
+                </span>
+              </div>
             </div>
-            <DollarSign className="w-10 h-10 text-green-600" />
+            <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center">
+              <DollarSign className="w-6 h-6 text-white" />
+            </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+        {/* Profit/Loss */}
+        <div className={`bg-gradient-to-br rounded-xl p-6 shadow-sm border ${
+          profit >= 0 
+            ? 'from-emerald-50 to-emerald-100 border-emerald-200' 
+            : 'from-red-50 to-red-100 border-red-200'
+        }`}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Savdolar soni</p>
-              <p className="text-2xl font-bold text-gray-900">{totalTransactions}</p>
-              <p className="text-sm text-green-600 mt-1">+8% oldingi davr bilan</p>
+              <p className={`text-sm font-medium ${
+                profit >= 0 ? 'text-emerald-700' : 'text-red-700'
+              }`}>
+                {profit >= 0 ? 'Foyda' : 'Zarar'}
+              </p>
+              <p className={`text-3xl font-bold mt-1 ${
+                profit >= 0 ? 'text-emerald-900' : 'text-red-900'
+              }`}>
+                {formatPrice(Math.abs(profit))} so'm
+              </p>
+              <div className="flex items-center mt-2">
+                <span className={`text-sm font-medium ${
+                  profit >= 0 ? 'text-emerald-600' : 'text-red-600'
+                }`}>
+                  {profitMargin.toFixed(1)}% foyda marjasi
+                </span>
+              </div>
             </div>
-            <TrendingUp className="w-10 h-10 text-blue-600" />
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+              profit >= 0 ? 'bg-emerald-500' : 'bg-red-500'
+            }`}>
+              {profit >= 0 ? (
+                <TrendingUp className="w-6 h-6 text-white" />
+              ) : (
+                <TrendingDown className="w-6 h-6 text-white" />
+              )}
+            </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+        {/* Total Transactions */}
+        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 shadow-sm border border-blue-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">O'rtacha savdo</p>
-              <p className="text-2xl font-bold text-gray-900">{formatPrice(averageTransaction)} so'm</p>
-              <p className="text-sm text-yellow-600 mt-1">-2% oldingi davr bilan</p>
+              <p className="text-sm text-blue-700 font-medium">Savdolar soni</p>
+              <p className="text-3xl font-bold text-blue-900 mt-1">{totalTransactions}</p>
+              <div className="flex items-center mt-2">
+                {getChangeIcon(transactionChange)}
+                <span className={`text-sm font-medium ml-1 ${getChangeColor(transactionChange)}`}>
+                  {formatPercentage(transactionChange)} oldingi davr bilan
+                </span>
+              </div>
             </div>
-            <BarChart3 className="w-10 h-10 text-purple-600" />
+            <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center">
+              <TrendingUp className="w-6 h-6 text-white" />
+            </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+        {/* Average Transaction */}
+        <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 shadow-sm border border-purple-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Faol mijozlar</p>
-              <p className="text-2xl font-bold text-gray-900">{customers.length}</p>
-              <p className="text-sm text-green-600 mt-1">+15% oldingi davr bilan</p>
+              <p className="text-sm text-purple-700 font-medium">O'rtacha savdo</p>
+              <p className="text-3xl font-bold text-purple-900 mt-1">{formatPrice(averageTransaction)} so'm</p>
+              <div className="flex items-center mt-2">
+                <Activity className="w-4 h-4 text-purple-600" />
+                <span className="text-sm text-purple-600 font-medium ml-1">
+                  {totalProductsSold} ta mahsulot sotilgan
+                </span>
+              </div>
             </div>
-            <Users className="w-10 h-10 text-orange-600" />
+            <div className="w-12 h-12 bg-purple-500 rounded-xl flex items-center justify-center">
+              <BarChart3 className="w-6 h-6 text-white" />
+            </div>
+          </div>
+        </div>
+
+        {/* Active Customers */}
+        <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-6 shadow-sm border border-orange-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-orange-700 font-medium">Faol mijozlar</p>
+              <p className="text-3xl font-bold text-orange-900 mt-1">{uniqueCustomers}</p>
+              <div className="flex items-center mt-2">
+                <Users className="w-4 h-4 text-orange-600" />
+                <span className="text-sm text-orange-600 font-medium ml-1">
+                  {customers.length} jami mijoz
+                </span>
+              </div>
+            </div>
+            <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center">
+              <Users className="w-6 h-6 text-white" />
+            </div>
           </div>
         </div>
       </div>
@@ -246,7 +571,7 @@ export function ReportsPage() {
                   </td>
                   <td className="py-4 px-6">
                     <p className="text-sm text-gray-900">
-                      {sale.items.length} ta mahsulot
+                      {sale.items && Array.isArray(sale.items) ? sale.items.length : 0} ta mahsulot
                     </p>
                   </td>
                   <td className="py-4 px-6">

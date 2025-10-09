@@ -61,6 +61,7 @@ export default function Dashboard() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header
           onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)}
+          onPageChange={setCurrentPage}
         />
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-3 sm:p-4 lg:p-6">
           {renderCurrentPage()}

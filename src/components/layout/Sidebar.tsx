@@ -22,7 +22,7 @@ export function Sidebar({ currentPage, onPageChange, isOpen, onClose }: SidebarP
     { id: 'sales', label: 'Savdo (Kassa)', icon: ShoppingCart },
     { id: 'customers', label: 'Mijozlar', icon: Users },
     { id: 'employees', label: 'Xodimlar', icon: UserCheck },
-    { id: 'analytics', label: 'Hisobotlar', icon: BarChart3 },
+    { id: 'reports', label: 'Hisobotlar', icon: BarChart3 },
     { id: 'settings', label: 'Sozlamalar', icon: Settings },
   ];
 

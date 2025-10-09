@@ -5,9 +5,10 @@ import { useNotifications } from '../../contexts/NotificationContext';
 
 interface HeaderProps {
   onMenuClick: () => void;
+  onPageChange?: (page: string) => void;
 }
 
-export function Header({ onMenuClick }: HeaderProps) {
+export function Header({ onMenuClick, onPageChange }: HeaderProps) {
   const { user, logout } = useAuth();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const [showNotifications, setShowNotifications] = useState(false);
@@ -149,7 +150,22 @@ export function Header({ onMenuClick }: HeaderProps) {
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    notification.action?.onClick();
+                                    if (notification.action) {
+                                      if (onPageChange && notification.action.label === 'Ko\'rish') {
+                                        // Tugab qolgan mahsulotlar uchun
+                                        if (notification.title.includes('Tugab qolgan')) {
+                                          onPageChange('dashboard');
+                                          // Dashboard'da low stock modalini ochish uchun custom event
+                                          window.dispatchEvent(new CustomEvent('openLowStockModal'));
+                                        } else if (notification.title.includes('Yangi savdo')) {
+                                          onPageChange('sales');
+                                        } else {
+                                          onPageChange('products');
+                                        }
+                                      } else {
+                                        notification.action.onClick();
+                                      }
+                                    }
                                   }}
                                   className="text-xs text-blue-600 hover:text-blue-700 font-medium"
                                 >

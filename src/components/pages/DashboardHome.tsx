@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   ShoppingCart, Package, Users, TrendingUp, 
-  AlertTriangle, DollarSign, Calendar, Award 
+  AlertTriangle, DollarSign, Calendar, Award, X
 } from 'lucide-react';
 import { useData } from '../../contexts/DataContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -14,6 +14,7 @@ export function DashboardHome({ onPageChange }: DashboardHomeProps) {
   const { products, customers, sales } = useData();
   const { user } = useAuth();
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [showLowStockModal, setShowLowStockModal] = useState(false);
 
   // Real-time vaqt yangilanishi
   useEffect(() => {
@@ -22,6 +23,18 @@ export function DashboardHome({ onPageChange }: DashboardHomeProps) {
     }, 1000);
 
     return () => clearInterval(timer);
+  }, []);
+
+  // Custom event listener for opening low stock modal
+  useEffect(() => {
+    const handleOpenLowStockModal = () => {
+      setShowLowStockModal(true);
+    };
+
+    window.addEventListener('openLowStockModal', handleOpenLowStockModal);
+    return () => {
+      window.removeEventListener('openLowStockModal', handleOpenLowStockModal);
+    };
   }, []);
 
   const lowStockProducts = products.filter(p => p.quantity <= p.min_quantity);
@@ -47,7 +60,9 @@ export function DashboardHome({ onPageChange }: DashboardHomeProps) {
       icon: DollarSign,
       color: "bg-green-500",
       change: todaysSalesCount > 0 ? `+${todaysSalesCount} savdo` : "Savdo yo'q",
-      subtitle: `O'rtacha: ${averageSale.toLocaleString()} so'm`
+      subtitle: `O'rtacha: ${averageSale.toLocaleString()} so'm`,
+      onClick: () => onPageChange('sales'),
+      clickable: true
     },
     {
       title: "Jami mahsulotlar",
@@ -55,7 +70,9 @@ export function DashboardHome({ onPageChange }: DashboardHomeProps) {
       icon: Package,
       color: "bg-blue-500",
       change: totalProducts > 0 ? `${totalProducts} ta` : "Mahsulot yo'q",
-      subtitle: `Omborida`
+      subtitle: `Omborida`,
+      onClick: () => onPageChange('products'),
+      clickable: true
     },
     {
       title: "Faol mijozlar",
@@ -63,7 +80,9 @@ export function DashboardHome({ onPageChange }: DashboardHomeProps) {
       icon: Users,
       color: "bg-purple-500",
       change: totalCustomers > 0 ? `${totalCustomers} mijoz` : "Mijoz yo'q",
-      subtitle: `Ro'yxatda`
+      subtitle: `Ro'yxatda`,
+      onClick: () => onPageChange('customers'),
+      clickable: true
     },
     {
       title: "Tugab qolgan",
@@ -71,7 +90,9 @@ export function DashboardHome({ onPageChange }: DashboardHomeProps) {
       icon: AlertTriangle,
       color: lowStockCount > 0 ? "bg-red-500" : "bg-green-500",
       change: lowStockCount > 0 ? "Diqqat!" : "Hammasi OK",
-      subtitle: lowStockCount > 0 ? `${lowStockCount} ta mahsulot` : "Yetarli miqdor"
+      subtitle: lowStockCount > 0 ? `${lowStockCount} ta mahsulot` : "Yetarli miqdor",
+      onClick: () => setShowLowStockModal(true),
+      clickable: true
     }
   ];
 
@@ -110,7 +131,13 @@ export function DashboardHome({ onPageChange }: DashboardHomeProps) {
         {stats.map((stat, index) => {
           const Icon = stat.icon;
           return (
-            <div key={index} className="bg-white rounded-xl p-3 sm:p-4 lg:p-6 shadow-sm border border-gray-200">
+            <div 
+              key={index} 
+              onClick={stat.clickable ? stat.onClick : undefined}
+              className={`bg-white rounded-xl p-3 sm:p-4 lg:p-6 shadow-sm border border-gray-200 ${
+                stat.clickable ? 'cursor-pointer hover:shadow-md hover:border-gray-300 transition-all duration-200' : ''
+              }`}
+            >
               <div className="flex items-center justify-between mb-2 sm:mb-4">
                 <div className={`w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 ${stat.color} rounded-lg flex items-center justify-center`}>
                   <Icon className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-white" />
@@ -126,6 +153,11 @@ export function DashboardHome({ onPageChange }: DashboardHomeProps) {
               <p className="text-gray-600 text-sm sm:text-base">{stat.title}</p>
               {stat.subtitle && (
                 <p className="text-xs sm:text-sm text-gray-500 mt-1">{stat.subtitle}</p>
+              )}
+              {stat.clickable && (
+                <div className="mt-2 text-xs text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                  Bosing →
+                </div>
               )}
             </div>
           );
@@ -224,6 +256,96 @@ export function DashboardHome({ onPageChange }: DashboardHomeProps) {
           )}
         </div>
       </div>
+
+      {/* Low Stock Modal */}
+      {showLowStockModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-semibold text-gray-900 flex items-center space-x-2">
+                  <AlertTriangle className="w-6 h-6 text-red-600" />
+                  <span>Tugab qolgan mahsulotlar ({lowStockProducts.length})</span>
+                </h2>
+                <button
+                  onClick={() => setShowLowStockModal(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {lowStockProducts.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Package className="w-8 h-8 text-green-600" />
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Hamma mahsulotlar yetarli miqdorda</h3>
+                  <p className="text-gray-500">Tugab qolgan mahsulotlar yo'q</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <div className="flex items-center space-x-2">
+                      <AlertTriangle className="w-5 h-5 text-red-600" />
+                      <p className="text-red-800 font-medium">
+                        {lowStockProducts.length} ta mahsulot tugab qolgan. Tezda to'ldiring!
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {lowStockProducts.map((product) => (
+                      <div key={product.id} className="border border-red-200 rounded-lg p-4 bg-red-50">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-gray-900 mb-1">{product.name}</h3>
+                            <p className="text-sm text-gray-600 mb-2">{product.brand}</p>
+                            <div className="space-y-1">
+                              <div className="flex justify-between">
+                                <span className="text-sm text-gray-600">Kategoriya:</span>
+                                <span className="text-sm font-medium">{product.category}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-sm text-gray-600">Mavjud:</span>
+                                <span className="text-sm font-bold text-red-600">{product.quantity} ta</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-sm text-gray-600">Minimal:</span>
+                                <span className="text-sm font-medium">{product.min_quantity} ta</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-sm text-gray-600">Narx:</span>
+                                <span className="text-sm font-medium">{product.selling_price.toLocaleString()} so'm</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="mt-4 pt-3 border-t border-red-200">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-red-600 font-medium">
+                              {product.quantity < product.min_quantity ? 'Kritik daraja!' : 'Kam qoldi'}
+                            </span>
+                            <button
+                              onClick={() => {
+                                setShowLowStockModal(false);
+                                onPageChange('products');
+                              }}
+                              className="text-xs bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 transition-colors"
+                            >
+                              Tahrirlash
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
