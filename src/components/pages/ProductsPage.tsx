@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Package, Plus, Search, Edit, Trash2, AlertCircle, Tag, X, Image as ImageIcon } from 'lucide-react';
 import { useData, Product } from '../../contexts/DataContext';
 import { useCategories, Category } from '../../contexts/CategoryContext';
@@ -19,6 +19,11 @@ export function ProductsPage() {
   const [showCategoryEditModal, setShowCategoryEditModal] = useState(false);
   const [editingCategoryData, setEditingCategoryData] = useState<Category | null>(null);
   const [showCategoriesModal, setShowCategoriesModal] = useState(false);
+  const [usedProductNames, setUsedProductNames] = useState<Set<string>>(new Set());
+  const [nameSuggestions, setNameSuggestions] = useState<string[]>([]);
+  const [showNameSuggestions, setShowNameSuggestions] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
   // const [uploadingImage, setUploadingImage] = useState(false);
   // const [previewImage, setPreviewImage] = useState<string | null>(null);
   // const fileInputRef = useRef<HTMLInputElement>(null);
@@ -59,6 +64,12 @@ export function ProductsPage() {
     return matchesSearch && matchesCategoryFilter;
   });
 
+  // Mahsulot nomlarini yig'ish
+  useEffect(() => {
+    const names = new Set(products.map(product => product.name.toLowerCase()));
+    setUsedProductNames(names);
+  }, [products]);
+
   // Avtomatik hisoblash funksiyasi
   useEffect(() => {
     const quantity = parseFloat(formData.quantity) || 0;
@@ -72,6 +83,51 @@ export function ProductsPage() {
       }));
     }
   }, [formData.quantity, formData.cost_price]);
+
+  // Mahsulot nomi o'zgarishini kuzatish
+  useEffect(() => {
+    if (formData.name.length > 0) {
+      const nameLower = formData.name.toLowerCase();
+      const suggestions = Array.from(usedProductNames).filter(name => 
+        name.includes(nameLower) && name !== nameLower
+      ).slice(0, 5);
+      setNameSuggestions(suggestions);
+      setShowNameSuggestions(suggestions.length > 0);
+    } else {
+      setShowNameSuggestions(false);
+      setNameSuggestions([]);
+    }
+  }, [formData.name, usedProductNames]);
+
+  // Click outside to close suggestions
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        suggestionsRef.current &&
+        nameInputRef.current &&
+        !suggestionsRef.current.contains(event.target as Node) &&
+        !nameInputRef.current.contains(event.target as Node)
+      ) {
+        setShowNameSuggestions(false);
+      }
+    };
+
+    if (showNameSuggestions) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showNameSuggestions]);
+
+  const handleNameSuggestionClick = (suggestion: string) => {
+    setFormData(prev => ({
+      ...prev,
+      name: suggestion
+    }));
+    setShowNameSuggestions(false);
+  };
 
   const resetForm = () => {
     setFormData({
@@ -91,6 +147,7 @@ export function ProductsPage() {
     // setPreviewImage(null);
     setShowAddForm(false);
     setEditingProduct(null);
+    setShowNameSuggestions(false);
   };
 
   const resetCategoryForm = () => {
@@ -124,7 +181,8 @@ export function ProductsPage() {
 
   const handleDeleteCategory = async (id: string, name: string) => {
     const confirmDelete = window.confirm(
-      `"${name}" kategoriyasini o'chirishni xohlaysizmi?\n\nDiqqat: Bu kategoriyaga bog'langan mahsulotlar ham o'chiriladi!`
+      `"${name}" kategoriyasini o'chirishni xohlaysizmi?\n\n` +
+      `Diqqat: Bu kategoriyadagi barcha mahsulotlar "Kategoriyasiz" kategoriyasiga o'tkaziladi va mahsulotlar o'chmaydi.`
     );
     
     if (!confirmDelete) return;
@@ -132,7 +190,7 @@ export function ProductsPage() {
     setIsDeletingCategory(id);
     try {
       await deleteCategory(id);
-      alert('Kategoriya muvaffaqiyatli o\'chirildi!');
+      alert(`Kategoriya muvaffaqiyatli o'chirildi!\n\n"${name}" kategoriyasidagi barcha mahsulotlar "Kategoriyasiz" kategoriyasiga o'tkazildi.`);
     } catch (error) {
       console.error('Error deleting category:', error);
       alert('Kategoriya o\'chirilmadi. Xatolik: ' + (error as Error).message);
@@ -408,6 +466,7 @@ export function ProductsPage() {
     // setPreviewImage(product.image_url || null);
     setEditingProduct(product);
     setShowAddForm(true);
+    setShowNameSuggestions(false); // Tahrirlashda takliflarni yashirish
   };
 
   const formatPrice = (price: number) => {
@@ -642,16 +701,63 @@ export function ProductsPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Mahsulot nomi *
                   </label>
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    disabled={isSubmitting}
-                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                      isSubmitting ? 'bg-gray-100 cursor-not-allowed' : ''
-                    }`}
-                    required
-                  />
+                  <div className="relative">
+                    <input
+                      ref={nameInputRef}
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      disabled={isSubmitting}
+                      className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        isSubmitting ? 'bg-gray-100 cursor-not-allowed' : ''
+                      }`}
+                      required
+                      placeholder="Masalan: iPhone 15 Pro Max"
+                    />
+                    
+                    {/* Takliflar ro'yxati */}
+                    {showNameSuggestions && nameSuggestions.length > 0 && (
+                      <div ref={suggestionsRef} className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                        <div className="p-2 border-b border-gray-200 bg-blue-50">
+                          <p className="text-xs font-medium text-blue-700">Avval qo'shilgan mahsulotlar:</p>
+                        </div>
+                        {nameSuggestions.map((suggestion, index) => (
+                          <button
+                            key={index}
+                            type="button"
+                            onClick={() => handleNameSuggestionClick(suggestion)}
+                            className="w-full text-left px-3 py-2 hover:bg-gray-100 text-sm border-b border-gray-100 last:border-b-0"
+                          >
+                            <span className="text-gray-700">{suggestion}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Takroriy nom xatoligi */}
+                  {formData.name && usedProductNames.has(formData.name.toLowerCase()) && !editingProduct && (
+                    <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <div className="flex items-center">
+                        <AlertCircle className="w-4 h-4 text-yellow-600 mr-2" />
+                        <span className="text-sm text-yellow-700">
+                          Bu nom allaqachon ishlatilgan! Boshqa nom tanlang yoki mavjud mahsulotni tahrirlang.
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Tahrirlashda takroriy nom xatoligi */}
+                  {formData.name && usedProductNames.has(formData.name.toLowerCase()) && editingProduct && editingProduct.name.toLowerCase() !== formData.name.toLowerCase() && (
+                    <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-lg">
+                      <div className="flex items-center">
+                        <AlertCircle className="w-4 h-4 text-red-600 mr-2" />
+                        <span className="text-sm text-red-700">
+                          Bu nom boshqa mahsulotda ishlatilgan! Boshqa nom tanlang.
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                      <div>

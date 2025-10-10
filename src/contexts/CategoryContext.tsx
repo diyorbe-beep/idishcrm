@@ -94,12 +94,30 @@ export function CategoryProvider({ children }: { children: ReactNode }) {
 
   const deleteCategory = async (id: string) => {
     try {
-      const { error } = await supabase
+      // Avval kategoriyani topamiz
+      const categoryToDelete = categories.find(cat => cat.id === id);
+      if (!categoryToDelete) {
+        throw new Error('Kategoriya topilmadi');
+      }
+
+      // O'sha kategoriyadagi barcha mahsulotlarning kategoriyasini "Kategoriyasiz" qilib qo'yamiz
+      const { error: updateError } = await supabase
+        .from('products')
+        .update({ category: 'Kategoriyasiz' })
+        .eq('category', categoryToDelete.name);
+
+      if (updateError) {
+        console.error('Error updating products category:', updateError);
+        // Mahsulotlarni yangilashda xatolik bo'lsa ham kategoriyani o'chirishga davom etamiz
+      }
+
+      // Endi kategoriyani o'chiramiz
+      const { error: deleteError } = await supabase
         .from('categories')
         .delete()
         .eq('id', id);
 
-      if (error) throw error;
+      if (deleteError) throw deleteError;
       setCategories(prev => prev.filter(category => category.id !== id));
     } catch (error) {
       console.error('Error deleting category:', error);
